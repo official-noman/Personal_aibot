@@ -742,7 +742,8 @@ note_add{text:string}   note_search{query:string}
 pin_add{text:string, cat?:"dua"|"rule"|"reminder", title?:string, wake?:boolean}
 checkin_save{mood:0..4, text?:string}
 stats_today{}  backup_export{}  navigate{view:"home"|"tasks"|"sleep"|"checklist"|"checkin"|"notes"|"pins"|"geo"}  help{}
-geo_add{label:string, place:string, radius?:number}  geo_list{}  geo_delete{query:string}  geo_enable{}  geo_disable{}`;
+geo_add{label:string, place:string, radius?:number}  geo_list{}  geo_delete{query:string}  geo_enable{}  geo_disable{}
+save_memory{fact:string}`;
 
 function stateSummary() {
   const open = tasks.filter(t => !t.done).slice(0, 20).map(t => `- ${t.title}${t.due ? ' (due ' + t.due + ')' : ''}`);
@@ -758,12 +759,14 @@ function stateSummary() {
   ].join('\n');
 }
 
-async function askLLM(userText) {
+async function askLLM(userText, memCtx = '') {
   const sys = `Tumi "Persona" — ekta personal companion app er assistant. User Banglish/Bangla/English mishiye kotha bole. Tumi-o Banglish e chhoto, uposhom kore uttor dao (max 3 line).
 Tomar kachhe ei tool gulo ache:${LLM_TOOLS}
+Jodi user er kono personal kotha/facts pash (jemon pet er nam, allergy, pochondo, favourite khabar), tahole save_memory tool call korbe.
 User er kotha bujhe joto gulo dorkar toto action banao. Kono action dorkar na hole actions faka rakho.
 App er ekhonkar obostha:
 ${stateSummary()}
+${memCtx ? 'User er byapare tomar purano memory (Semantic Search results):\n' + memCtx : ''}
 Shudhu ei JSON format e uttor dao: {"reply":"...","actions":[{"name":"task_add","args":{"title":"..."}}],"chips":["..."]}`;
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(aiCfg.model)}:generateContent?key=${encodeURIComponent(aiCfg.key)}`;
@@ -805,7 +808,12 @@ async function handleUserText(raw) {
   try {
     if (aiCfg.on && aiCfg.key && navigator.onLine) {
       try {
-        const out = await askLLM(text);
+        let memCtx = '';
+        if (typeof RAG !== 'undefined' && RAG.ready) {
+           const mems = await RAG.search(text, 3);
+           if (mems.length) memCtx = mems.map(m => '- ' + m.text).join('\n');
+        }
+        const out = await askLLM(text, memCtx);
         const results = [];
         for (const a of (out.actions || [])) results.push(await runAction(a.name, a.args));
         const extra = results.filter(r => r && r.text && !r.silent).map(r => r.text).join('\n');

@@ -30,22 +30,26 @@ function haversine(lat1, lon1, lat2, lon2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-/* ---------- geocoding (Open-Meteo — free, CORS open, key lage na) ---------- */
+/* ---------- geocoding (Photon API / OpenStreetMap — free, CORS open, key lage na, detailed) ---------- */
 async function geocode(query) {
   if (!query || !query.trim()) return null;
-  const url = `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=5&format=json`;
+  const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=5`;
   try {
     const r = await fetch(url);
     if (!r.ok) return null;
     const d = await r.json();
-    if (!d.results || !d.results.length) return null;
-    return d.results.map(r => ({
-      name: [r.name, r.admin3, r.admin2, r.admin1, r.country].filter(Boolean).join(', '),
-      shortName: r.name,
-      lat: r.latitude,
-      lon: r.longitude,
-      country: r.country,
-    }));
+    if (!d.features || !d.features.length) return null;
+    return d.features.map(f => {
+      const p = f.properties;
+      const geo = f.geometry.coordinates;
+      return {
+        name: [p.name, p.street, p.city, p.state, p.country].filter(Boolean).join(', '),
+        shortName: p.name || p.street || p.city || 'Unknown',
+        lat: geo[1],
+        lon: geo[0],
+        country: p.country,
+      };
+    });
   } catch (e) { console.warn('[geo] geocode fail', e); return null; }
 }
 
