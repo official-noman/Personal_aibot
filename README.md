@@ -1,55 +1,65 @@
-# Persona
+# ✨ Persona — Personal AI Assistant
 
-Offline-first personal companion PWA — task, ghum tracking, daily checklist,
-mood check-in, notes/pins, ar ekta Banglish chat assistant je nijei sob kaj
-kore dey.
+**Persona** holo ekta 100% offline-first, private ebang highly intelligent Personal Assistant PWA (Progressive Web App). Eta tomar daily kaj, ghum, check-in, notes ar location-based reminders—sob kichu ek jaygay track kore. Er moddhe ache ekta floating AI chat brain, jeta tumi kotha bollei kaj kore dibe!
 
-Kono backend nei, kono account nei, kono build step nei. Sob data tomar
-phone-er `localStorage` e thake.
+---
 
-## Ki ki ache
+## 🌟 Key Features
 
-- **Kaj** — task add/complete, due time, alarm + notification
-- **Ghum** — sleep start/wake, duration history, rating
-- **Checklist** — roj er obhyash, customizable, history
-- **Check-in** — mood log, roj er chhoto proshno
-- **Notes & Pins** — dua / niyom / reminder, "uthe ja dekhbo" list
-- **Chat** — Banglish e likho: *"kal shokal 8 tay doctor er appointment"* →
-  task + alarm set hoye jabe. Offline e-i kaj kore.
-- **Alarm** — WebAudio diye tone, snooze/dismiss, app bondho thakleo notification
+### 🧠 AI Chat Brain (Offline & LLM Ready)
+- **Floating Chat Head:** Jekono screen theke ✨ icon e tap kore chat open kora jay. Drag kore screen er jekono jaygay rakha jay.
+- **Offline Intent Parser:** Net na thakleo Banglish/Bangla/English e kotha bujhte pare (jemon: *"kal bikel 5 tay bazar korte hobe"*, *"uthe gechi"*).
+- **LLM Integration:** Gemini API key dile eta aro smart hoye jay, tokhon natural conversation chalano jay. (Settings theke API key add kora jay).
 
-## Chalano
+### 📍 Radars (Geo-fencing & Location Reminders)
+- **Jaygay gele Reminder:** *"Dhanmondi gele boi kinte mone koriyo"* — ei kotha chat e bollei ba map e pin korlei location reminder set hoye jabe.
+- **Offline Tracking:** Ekbar jayga set korle, phone er native GPS diye background e track korbe (net lagbe na). 200m er ashepashe aslei alarm beje uthbe!
+- **Free Geocoding:** Photon API (OpenStreetMap) use korechi, jar fole Farmgate ba Panthapath er moto choto elakao khuje pabe. Kono map API key lage na! (Leaflet.js included).
+
+### ♾️ Infinite Memory (Local RAG Pipeline)
+- **Transformers.js & WebAssembly:** Zero hosting cost e browser er vetorei AI model (all-MiniLM-L6-v2) run kore!
+- **100% Private:** Tumi jokhon *"Save memory amar dog er nam Max"* bolbe, tokon etar Semantic Vector embedding banie phone er **IndexedDB** te save kore rakhbe.
+- **Smart Recall:** Pore jokhon kono pet food er kotha jiges korbe, app nijer memory theke "User has a dog named Max" context ta bujhe perfect answer dibe!
+
+### ⏰ Professional Alarm & Web Audio Engine
+- **Custom Ringtones:** Kono MP3 file lagbe na! **Web Audio API** use kore math (Oscillators) diye 6 dhoroner premium ringtone (Classic, Chime, Digital, Norom, Ripple) toiri kora hoyeche.
+- **Background Notification API:** App close thakleo thik time e notification asbe ar vibrate korbe. PWA Notification click korle alarm er screen popup hobe.
+
+### 💼 Daily Life Tools
+- **Tasks & Todos:** Kaj er list, due date ar time track kora.
+- **Sleep Tracker:** Ghumate jaoa ar othar hisheb, daily stats.
+- **Check-ins:** Mood track kora ar short note lekha.
+- **Notes & Pins:** Uthar por (Wake up) ba emergency dua ba rule pin kore rakha.
+
+---
+
+## 🚀 Kibhabe Run Korbe?
+
+Project ta fully Vanilla HTML/CSS/JS diye banano, kono build tool ba npm dependency nai (no node_modules). Tumi just ekta local server on korei run korte parbe:
 
 ```bash
-git clone https://github.com/official-noman/Personal_aibot.git
-cd Personal_aibot
-python3 -m http.server 8000
+# Terminal e ei command ta dao
+python3 -m http.server 8123
 ```
+Tarpor browser e giye `http://localhost:8123` open koro.
 
-Tarpor phone/browser e `http://localhost:8000`. Chrome e "Add to Home screen"
-dile app er moto install hoye jabe.
+---
 
-> `file://` diye kholo na — service worker, offline cache ar notification kaj
-> korbe na.
+## 🌐 Deployment (Cloudflare Pages / Vercel / GitHub Pages)
 
-## AI mode (optional)
+App ta completely static ar serverless. Tai tumi easily free te deploy korte parbe:
+1. Ei repo ta GitHub e push koro.
+2. Cloudflare Pages ba Vercel e connect kore deploy koro.
+3. *Note:* PWA, Service Worker ar Geolocation properly kaj korar jonno obossoi **HTTPS (SSL)** thakte hobe (jeta Cloudflare automatically diye dey).
 
-Default e chat **offline brain** diye chole — kono key lage na, internet o na.
+---
 
-Aro free-form kotha bujhate chaile Settings → AI te nijer
-[Gemini API key](https://aistudio.google.com/apikey) dao. Key shudhu tomar
-browser er localStorage e thake, ar shudhu Google er API te jay — amader kachhe
-kichu ashe na (server-i to nei).
+## 🛠️ Tech Stack & Architecture
+- **Frontend:** HTML5, CSS3 (Vanilla, CSS Variables for Dark Theme), JavaScript (ES6+).
+- **Storage:** `localStorage` (state er jonno), `IndexedDB` (AI Memory er vector database er jonno).
+- **AI & NLP:** `@xenova/transformers` (WASM in-browser AI), Regex & Custom Lexical Token Matching (Offline Intent Parser).
+- **Maps:** Leaflet.js, Photon Geocoding API (OSM).
+- **PWA:** Service Worker (`sw.js`), Web App Manifest (`manifest.json`), Web Notifications API.
 
-## Structure
-
-```
-index.html    markup + view gulo
-app.js        storage, state, render, notification
-chat.js       chat brain (NLU parser + optional Gemini)
-alarm.js      alarm tone, ringing, snooze
-styles.css    sob style
-sw.js         offline cache
-```
-
-Developer detail er jonno [CLAUDE.md](CLAUDE.md) dekho.
+---
+*Created with ❤️ to make personal life organized & smart!*
