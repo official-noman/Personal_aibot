@@ -19,6 +19,7 @@ let sheetRows   = DB.get('sheetRows', []);
 let pins        = DB.get('pins', []);               // { id, cat, title, text, wake, ts }
 let clItems     = DB.get('clItems', defaultChecklist());
 let clLog       = DB.get('clLog', {});              // { 'YYYY-MM-DD': [itemId] }
+let uiTheme     = DB.get('theme', 'dark');
 
 const save = {
   tasks: () => DB.set('tasks', tasks),
@@ -67,8 +68,8 @@ function humanDur(hrs) {
 /* ============================================================
    NAVIGATION
    ============================================================ */
-const TITLES = { home: 'Aaj', tasks: 'Kaj', sleep: 'Ghum', checklist: 'Checklist', checkin: 'Check-in', notes: 'Notes', sheet: 'Sheet', pins: 'Uthe ja dekhbo' };
-const EYEBROWS = { home: 'Persona', tasks: 'Ki korte hobe', sleep: 'Bishram', checklist: 'Aajker obhyash', checkin: 'Nijer shathe', notes: 'Mone rakho', sheet: 'Date-time log', pins: 'Ghum theke uthe' };
+const TITLES = { home: 'Aaj', tasks: 'Kaj', sleep: 'Ghum', checklist: 'Checklist', checkin: 'Check-in', notes: 'Notes', sheet: 'Sheet', helpdesk: 'AI Help Desk', pins: 'Uthe ja dekhbo' };
+const EYEBROWS = { home: 'Persona', tasks: 'Ki korte hobe', sleep: 'Bishram', checklist: 'Aajker obhyash', checkin: 'Nijer shathe', notes: 'Mone rakho', sheet: 'Date-time log', helpdesk: 'Guide & commands', pins: 'Ghum theke uthe' };
 let currentView = 'home';
 
 function navTo(view) {
@@ -84,7 +85,7 @@ function navTo(view) {
 }
 function render(view) {
   ({ home: renderHome, tasks: renderTasks, sleep: renderSleep, checklist: renderChecklist,
-     checkin: renderCheckin, notes: renderNotes, sheet: renderSheet, pins: renderPins }[view] || (() => {}))();
+     checkin: renderCheckin, notes: renderNotes, sheet: renderSheet, helpdesk: renderHelpDesk, pins: renderPins }[view] || (() => {}))();
 }
 $$('.nav-btn').forEach(b => b.onclick = () => navTo(b.dataset.nav));
 document.addEventListener('click', e => {
@@ -96,6 +97,21 @@ document.addEventListener('click', e => {
 function openSheet() { $('#moreSheet').classList.remove('hidden'); }
 function closeSheet() { $('#moreSheet').classList.add('hidden'); }
 $$('[data-close="more"]').forEach(el => el.onclick = closeSheet);
+
+function applyTheme() {
+  document.body.classList.toggle('light', uiTheme === 'light');
+  const b = $('#themeToggleBtn');
+  if (b) {
+    b.querySelector('span').textContent = uiTheme === 'light' ? '🌙' : '☀️';
+    b.querySelector('b').textContent = uiTheme === 'light' ? 'Dark mode' : 'Light mode';
+    b.querySelector('small').textContent = uiTheme === 'light' ? 'Rater jonno dark UI' : 'Diner jonno white UI';
+  }
+}
+function toggleTheme() {
+  uiTheme = uiTheme === 'light' ? 'dark' : 'light';
+  DB.set('theme', uiTheme);
+  applyTheme();
+}
 
 /* ============================================================
    HOME
@@ -547,6 +563,25 @@ $('#sheetForm').onsubmit = e => {
 $('#sheetSearch').addEventListener('input', e => { sheetQuery = e.target.value; renderSheet(); });
 
 /* ============================================================
+   AI HELP DESK
+   ============================================================ */
+function renderHelpDesk() {
+  const box = $('#helpDeskList');
+  box.innerHTML = [
+    ['⏰', 'Task/alarm', 'kal bikel 5 tay bazar korte hobe'],
+    ['📍', 'Geo alarm', 'geo alarm: banani gele kola kinte mone koriyo'],
+    ['📊', 'Sheet row', 'sheet e save koro: 5 Aug 8pm client call - payment follow-up'],
+    ['📝', 'Note', 'likhe rakho: ammar oshudh kena lagbe'],
+    ['✅', 'Correct/delete', 'bazar task ta delete / oi kaj ta done'],
+    ['✨', 'Chat head', 'Web app-er vitore draggable. App-er baire Messenger-style bubble native Android app chara reliable na.'],
+  ].map(([ico, title, ex]) => `
+    <div class="help-row">
+      <div class="help-ico">${ico}</div>
+      <div><b>${esc(title)}</b><small>${esc(ex)}</small></div>
+    </div>`).join('');
+}
+
+/* ============================================================
    PINS (wake cards)
    ============================================================ */
 let pinCat = 'dua';
@@ -677,6 +712,8 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) chec
    INIT
    ============================================================ */
 function init() {
+  applyTheme();
+  $('#themeToggleBtn').onclick = toggleTheme;
   updateNotifBtn();
   initSW();
   navTo('home');

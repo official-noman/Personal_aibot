@@ -46,7 +46,7 @@ body {
   font-family: var(--font);
   overscroll-behavior-y: none;
   -webkit-font-smoothing: antialiased;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
 }
 h1, h3 { margin: 0; font-family: var(--display); }
 button { font-family: inherit; }
@@ -62,6 +62,28 @@ button { font-family: inherit; }
 @keyframes drift2 { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(-6vw,10vh) scale(1.15)} }
 @keyframes drift3 { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(5vw,-8vh) scale(1.1)} }
 @media (prefers-reduced-motion: reduce) { .blob { animation: none !important; } }
+
+body.light {
+  --void: #f6f8fc;
+  --night: #ffffff;
+  --dusk: #ffffff;
+  --dusk-2: #eef2f8;
+  --line: rgba(16,24,40,.1);
+  --line-2: rgba(16,24,40,.16);
+  --star: #101828;
+  --haze: #53627a;
+  --faint: #8a94a6;
+}
+body.light .aurora-bg { background: radial-gradient(100% 70% at 50% -10%, #eef5ff 0%, #f7f9fd 58%); }
+body.light .aurora-bg .blob { opacity: .24; mix-blend-mode: multiply; }
+body.light .topbar { background: linear-gradient(180deg, rgba(246,248,252,.96) 45%, transparent); }
+body.light .bottomnav { background: rgba(255,255,255,.86); }
+body.light .chat-panel { background: linear-gradient(180deg, #f8fbff, #ffffff 45%, #eef3fa); }
+body.light .chat-composer { background: rgba(255,255,255,.78); }
+body.light .msg.bot .bubble,
+body.light .chat-settings,
+body.light .alarm-support { background: rgba(16,24,40,.04); }
+body.light .sheet-backdrop { background: rgba(16,24,40,.24); }
 
 #app { min-height: 100dvh; display: flex; flex-direction: column; }
 
@@ -206,6 +228,13 @@ input[type="number"] { max-width: 150px; }
   .sheet-row { grid-template-columns: 82px minmax(0, 1fr) 28px; }
   .sheet-cat { grid-column: 2 / 3; justify-self: start; max-width: 100%; }
 }
+
+/* ---------- AI help desk ---------- */
+.help-list { display: flex; flex-direction: column; gap: 10px; }
+.help-row { display: flex; gap: 12px; align-items: flex-start; padding: 13px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: rgba(255,255,255,.04); }
+.help-ico { width: 34px; height: 34px; flex: 0 0 auto; display: grid; place-items: center; border-radius: 11px; background: rgba(109,94,252,.14); }
+.help-row b { display: block; font-size: 14px; margin-bottom: 4px; }
+.help-row small { display: block; color: var(--haze); font-size: 12.5px; line-height: 1.5; }
 
 /* ---------- sleep chart ---------- */
 .chart { display: flex; align-items: flex-end; gap: 7px; height: 140px; padding: 12px 6px 6px; background: var(--dusk); border: 1px solid var(--line); border-radius: var(--radius); }

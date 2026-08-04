@@ -376,7 +376,7 @@ const ACTIONS = {
   backup_export() { $('#exportBtn').click(); return { text: '⬇️ Backup file download hocche.' }; },
 
   navigate({ view }) {
-    const v = { home: 'home', tasks: 'tasks', sleep: 'sleep', checklist: 'checklist', checkin: 'checkin', notes: 'notes', sheet: 'sheet', pins: 'pins', geo: 'geo' }[view];
+    const v = { home: 'home', tasks: 'tasks', sleep: 'sleep', checklist: 'checklist', checkin: 'checkin', notes: 'notes', sheet: 'sheet', helpdesk: 'helpdesk', pins: 'pins', geo: 'geo' }[view];
     if (!v) return { text: 'Kon page e jabo bujhi nai.' };
     if (v === 'geo' && typeof openGeoView === 'function') { closeChat(); openGeoView(); return { text: 'Radar page e niye gelam.', silent: true }; }
     closeChat(); navTo(v);
@@ -418,8 +418,8 @@ const ACTIONS = {
 
   help() {
     return {
-      text: `Ami ja ja korte pari — clear format e likhle mismatch kom hoy:\n• **Kaj/alarm**: "kal bikel 5 tay bazar korte hobe"\n• **Sheet**: "sheet e save koro: 5 Aug 8pm client call - payment follow-up"\n• **Note**: "likhe rakho — ammar oshudh kena lagbe"\n• **Geo alarm**: "Dhanmondi gele boi kinte mone koriyo"\n• **Correct**: vul add hole "oi kaj ta delete" ba same kaj abar correct time diye bolo\n• **Dekhao**: "ki ki kaj baki", "sheet dekhao", "radar dekhao"`,
-      chips: ['Sheet dekhao', 'Ki ki kaj baki', 'Radar dekhao', 'Help'],
+      text: `Ami ja ja korte pari — clear format e likhle mismatch kom hoy:\n• **Kaj/alarm**: "kal bikel 5 tay bazar korte hobe"\n• **Sheet**: "sheet e save koro: 5 Aug 8pm client call - payment follow-up"\n• **Note**: "likhe rakho — ammar oshudh kena lagbe"\n• **Geo alarm**: "geo alarm: Banani gele kola kinte mone koriyo"\n• **Correct**: vul add hole "oi kaj ta delete" ba same kaj abar correct time diye bolo\n• **Dekhao**: "ki ki kaj baki", "sheet dekhao", "radar dekhao"`,
+      chips: ['AI Help Desk', 'Sheet dekhao', 'Ki ki kaj baki', 'Radar dekhao'],
     };
   },
 };
@@ -520,7 +520,7 @@ const KW = {
   backup: ['backup', 'export', 'data save koro'],
   help: ['help', 'ki korte paro', 'ki paro', 'sahajjo', 'kivabe', 'সাহায্য'],
   no: ['na', 'lagbe na', 'lagbena', 'thak', 'thak lagbe na', 'no', 'cancel', 'বাদ'],
-  geoAdd: ['gele mone', 'gele amake', 'gele remind', 'gele reminder', 'gele bolo', 'jaygay gele', 'kachhe gele', 'reach korle', 'pouchle', 'pounchle', 'pouche gele', 'gele korte', 'গেলে মনে', 'geo reminder', 'geo add', 'location reminder'],
+  geoAdd: ['geo alarm', 'location alarm', 'geo reminder', 'geo add', 'location reminder', 'gele mone', 'gele amake', 'gele remind', 'gele reminder', 'gele bolo', 'jaygay gele', 'kachhe gele', 'reach korle', 'pouchle', 'pounchle', 'pouche gele', 'gele korte', 'গেলে মনে'],
   geoList: ['geo list', 'geo dekhao', 'geo koto', 'radar dekhao', 'radar list', 'kon kon jaygay', 'jaygay reminder gulo'],
   geoDel: ['geo delete', 'geo muche', 'geo bad', 'geo remove', 'radar muche', 'radar baad'],
   geoOn: ['location on', 'location chalu', 'geo on', 'geo chalu', 'tracking on', 'tracking chalu', 'radar on'],
@@ -620,6 +620,7 @@ function parseIntent(raw) {
   if (hasAny(t, KW.sleepStat)) return { action: 'sleep_stats', args: {}, sure: true };
 
   /* ---- help / stats / backup ---- */
+  if (/ai help desk|help desk|guide dekhao/.test(t)) return { action: 'navigate', args: { view: 'helpdesk' }, sure: true };
   if (hasAny(t, KW.help)) return { action: 'help', args: {}, sure: true };
   if (hasAny(t, KW.backup)) return { action: 'backup_export', args: {}, sure: true };
   if (hasAny(t, KW.clStat)) return { action: 'checklist_status', args: {}, sure: true };
@@ -672,7 +673,7 @@ function parseIntent(raw) {
     return { action: 'checkin_save', args: { mood: mood.v, text: raw }, sure: true };
   }
   /* navigation */
-  const navHit = { home: ['home e', 'aaj dekhao'], tasks: ['kaj er page', 'task page'], sleep: ['ghum page', 'ghum dekhao'], checklist: ['checklist page'], notes: ['note dekhao', 'notes dekhao'], sheet: ['sheet page', 'sheet dekhao', 'log page'], pins: ['pin dekhao'], checkin: ['check in dekhao', 'checkin dekhao'], geo: ['radar page', 'radar dekhao', 'geo page', 'geo dekhao', 'location page'] };
+  const navHit = { home: ['home e', 'aaj dekhao'], tasks: ['kaj er page', 'task page'], sleep: ['ghum page', 'ghum dekhao'], checklist: ['checklist page'], notes: ['note dekhao', 'notes dekhao'], sheet: ['sheet page', 'sheet dekhao', 'log page'], helpdesk: ['ai help desk', 'help desk', 'guide dekhao'], pins: ['pin dekhao'], checkin: ['check in dekhao', 'checkin dekhao'], geo: ['radar page', 'radar dekhao', 'geo page', 'geo dekhao', 'location page'] };
   for (const [v, keys] of Object.entries(navHit)) if (hasAny(t, keys)) return { action: 'navigate', args: { view: v }, sure: true };
 
   /* ---- geo / location reminder ---- */
@@ -685,12 +686,16 @@ function parseIntent(raw) {
   }
   if (hasAny(t, KW.geoAdd)) {
     /* "Dhanmondi gele amake boi kinar kotha mone koriye dio" */
-    const parts = t.split(/\s*gele\s*/i);
+    const geoText = t
+      .replace(/^(geo|location)\s+(alarm|reminder)\s*/i, '')
+      .replace(/^alarm\s*/i, '')
+      .replace(/^[\s:-]+/, '');
+    const parts = geoText.split(/\s*gele\s*/i);
     let place = '', label = '';
     if (parts.length >= 2) {
       place = parts[0].replace(/^(ami |amake |amar |)/, '').trim();
       label = parts.slice(1).join(' ')
-        .replace(/\b(amake|amar|mone koriye dio|mone koriye dao|mone koriyo|remind koro|reminder|remind me|bolo|bolbe)\b/g, ' ')
+        .replace(/\b(amake|amar|mone koriye dio|mone koriye dao|mone koriyo|mone korio|remind koro|reminder|remind me|bolo|bolbe)\b/g, ' ')
         .replace(/\s+/g, ' ').trim();
     }
     if (!label && !place) {
@@ -769,7 +774,7 @@ note_add{text:string}   note_search{query:string}
 sheet_add{title:string, note?:string, when?:ISO datetime, cat?:string}  sheet_list{query?:string}
 pin_add{text:string, cat?:"dua"|"rule"|"reminder", title?:string, wake?:boolean}
 checkin_save{mood:0..4, text?:string}
-stats_today{}  backup_export{}  navigate{view:"home"|"tasks"|"sleep"|"checklist"|"checkin"|"notes"|"sheet"|"pins"|"geo"}  help{}
+stats_today{}  backup_export{}  navigate{view:"home"|"tasks"|"sleep"|"checklist"|"checkin"|"notes"|"sheet"|"helpdesk"|"pins"|"geo"}  help{}
 geo_add{label:string, place:string, radius?:number}  geo_list{}  geo_delete{query:string}  geo_enable{}  geo_disable{}
 save_memory{fact:string}`;
 
