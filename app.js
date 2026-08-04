@@ -112,6 +112,30 @@ function openSheet() { $('#moreSheet').classList.remove('hidden'); }
 function closeSheet() { $('#moreSheet').classList.add('hidden'); }
 $$('[data-close="more"]').forEach(el => el.onclick = closeSheet);
 
+function closeOverlays() {
+  ['#moreSheet', '#alarmSheet', '#chatPanel', '#sleepMode', '#wakeMode', '#alarmMode'].forEach(s => {
+    const el = $(s);
+    if (el) el.classList.add('hidden');
+  });
+  if (typeof chatOpen !== 'undefined') {
+    chatOpen = false;
+    const head = $('#chatHead');
+    if (head) head.classList.remove('hidden');
+  }
+  if (typeof stopRinging === 'function') stopRinging();
+}
+function overlayBack() {
+  closeOverlays();
+  updateTopActions();
+}
+function overlayHome() {
+  closeOverlays();
+  viewStack = [];
+  navTo('home', { replace: true });
+}
+$$('[data-overlay-back]').forEach(b => b.onclick = overlayBack);
+$$('[data-overlay-home]').forEach(b => b.onclick = overlayHome);
+
 function applyTheme() {
   document.body.classList.toggle('light', uiTheme === 'light');
   const b = $('#themeToggleBtn');

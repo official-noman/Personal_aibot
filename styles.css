@@ -346,6 +346,8 @@ input[type="number"] { max-width: 150px; }
 .sheet-backdrop { position: absolute; inset: 0; background: rgba(3,5,12,.6); backdrop-filter: blur(2px); animation: fade .2s; }
 .sheet-body { position: absolute; left: 0; right: 0; bottom: 0; background: var(--night); border-top: 1px solid var(--line-2);
   border-radius: 26px 26px 0 0; padding: 10px 18px calc(var(--safe-bottom) + 18px); animation: slideUp .3s cubic-bezier(.2,.8,.2,1); }
+.overlay-actions { display: flex; gap: 8px; justify-content: flex-start; margin: 2px 0 4px; position: relative; z-index: 5; }
+.fullscreen-actions { position: absolute; top: calc(var(--safe-top) + 14px); left: 16px; margin: 0; }
 @keyframes slideUp { from { transform: translateY(100%); } to { transform: none; } }
 @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
 .sheet-handle { width: 40px; height: 4px; border-radius: 3px; background: var(--line-2); margin: 6px auto 14px; }
