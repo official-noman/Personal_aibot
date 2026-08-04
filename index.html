@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#0a0e1a" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Persona" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+  <link rel="icon" href="icons/icon-192.png" />
+  <link rel="stylesheet" href="styles.css" />
+  <title>Persona</title>
+</head>
+<body>
+  <!-- ambient aurora, app-wide -->
+  <div class="aurora-bg" aria-hidden="true">
+    <span class="blob b1"></span>
+    <span class="blob b2"></span>
+    <span class="blob b3"></span>
+  </div>
+
+  <div id="app">
+    <header class="topbar">
+      <div class="topbar-title">
+        <span class="eyebrow" id="viewEyebrow">Persona</span>
+        <h1 id="viewTitle">Aaj</h1>
+      </div>
+      <button id="notifBtn" class="icon-btn" title="Reminder chalu koro" aria-label="Reminder chalu koro">
+        <span class="ico-bell"></span>
+      </button>
+    </header>
+
+    <main id="main">
+      <!-- ============ HOME ============ -->
+      <section class="view" data-view="home">
+        <p id="greeting" class="greeting"></p>
+
+        <!-- sleep status hero -->
+        <button id="sleepHero" class="sleep-hero" type="button">
+          <div class="sleep-hero-aurora"></div>
+          <div class="sleep-hero-body">
+            <div class="sleep-hero-label" id="sleepHeroLabel">Ghumer shomoy?</div>
+            <div class="sleep-hero-main" id="sleepHeroMain">Ghumate jao</div>
+            <div class="sleep-hero-sub" id="sleepHeroSub">Tap kore raat shuru koro</div>
+          </div>
+          <div class="sleep-hero-cta" id="sleepHeroCta">🌙</div>
+        </button>
+
+        <div class="stat-row">
+          <div class="stat-card"><div class="stat-num" id="statTasksLeft">0</div><div class="stat-label">Kaj baki</div></div>
+          <div class="stat-card"><div class="stat-num" id="statChecklist">0/0</div><div class="stat-label">Checklist</div></div>
+          <div class="stat-card"><div class="stat-num" id="statSleep">–</div><div class="stat-label">Kal ghum</div></div>
+        </div>
+
+        <div id="checkinPrompt" class="prompt-card hidden">
+          <div class="prompt-text" id="checkinPromptText"></div>
+          <button class="btn btn-soft" id="checkinPromptBtn">Check-in</button>
+        </div>
+
+        <div class="section-head"><h3>Aajker kaj</h3><button class="link-btn" data-goto="tasks">Shob →</button></div>
+        <div id="homeTasks" class="list"></div>
+
+        <div class="section-head"><h3>Aaj ki ki korlam</h3><button class="link-btn" data-goto="checklist">Checklist →</button></div>
+        <div id="homeChecklist" class="chip-wrap"></div>
+      </section>
+
+      <!-- ============ TASKS ============ -->
+      <section class="view hidden" data-view="tasks">
+        <form id="taskForm" class="input-card">
+          <input type="text" id="taskTitle" placeholder="Notun kaj lekho…" autocomplete="off" required />
+          <div class="input-row">
+            <input type="datetime-local" id="taskTime" aria-label="Reminder shomoy" />
+            <button type="submit" class="btn btn-primary">Add</button>
+          </div>
+        </form>
+        <div class="seg" id="taskFilter">
+          <button class="seg-btn active" data-filter="active">Baki</button>
+          <button class="seg-btn" data-filter="done">Shesh</button>
+          <button class="seg-btn" data-filter="all">Shob</button>
+        </div>
+        <div id="taskList" class="list"></div>
+      </section>
+
+      <!-- ============ SLEEP ============ -->
+      <section class="view hidden" data-view="sleep">
+        <button id="sleepStartBtn" class="big-sleep-btn" type="button">
+          <span class="big-sleep-ico">🌙</span>
+          <span class="big-sleep-text">Ghumate jachhi</span>
+          <span class="big-sleep-sub">Count-up timer shuru hobe</span>
+        </button>
+
+        <div class="stat-row">
+          <div class="stat-card"><div class="stat-num" id="sleepAvg">–</div><div class="stat-label">7 diner gor</div></div>
+          <div class="stat-card"><div class="stat-num" id="sleepLast">–</div><div class="stat-label">Shesh raat</div></div>
+        </div>
+
+        <div class="section-head"><h3>Shoptaher graph</h3></div>
+        <div id="sleepChart" class="chart"></div>
+
+        <div class="section-head">
+          <h3>Uthe ja dekhbo</h3>
+          <button class="link-btn" data-goto="pins">Manage →</button>
+        </div>
+        <div id="sleepPinPreview" class="list"></div>
+
+        <div class="section-head"><h3>Ghum-er itihas</h3></div>
+        <div id="sleepList" class="list"></div>
+
+        <form id="sleepManualForm" class="input-card muted-card">
+          <div class="field-label">Manual entry (jodi timer na chole)</div>
+          <div class="input-row">
+            <input type="number" id="sleepHours" min="0" max="24" step="0.25" placeholder="ghonta, jemon 7.5" />
+            <input type="date" id="sleepDate" aria-label="Tarikh" />
+            <button type="submit" class="btn btn-soft">Log</button>
+          </div>
+        </form>
+      </section>
+
+      <!-- ============ CHECKLIST ============ -->
+      <section class="view hidden" data-view="checklist">
+        <div class="ring-card">
+          <div class="ring" id="checklistRing">
+            <svg viewBox="0 0 120 120"><circle class="ring-bg" cx="60" cy="60" r="52"/><circle class="ring-fg" id="ringFg" cx="60" cy="60" r="52"/></svg>
+            <div class="ring-center"><span id="ringPct">0%</span><small id="ringCount">0/0</small></div>
+          </div>
+          <div class="ring-side">
+            <div class="ring-date" id="checklistDate"></div>
+            <div class="ring-msg" id="checklistMsg">Aajker kaj shuru koro</div>
+            <button class="btn btn-soft" id="manageChecklistBtn">Option manage</button>
+          </div>
+        </div>
+
+        <div id="checklistItems" class="list"></div>
+
+        <!-- manage panel -->
+        <div id="checklistManage" class="input-card hidden">
+          <div class="field-label">Notun option add koro</div>
+          <div class="emoji-pick" id="clEmojiPick"></div>
+          <div class="input-row">
+            <input type="text" id="clNewLabel" placeholder="jemon: Namaz porechi" autocomplete="off" />
+            <button class="btn btn-primary" id="clAddBtn" type="button">Add</button>
+          </div>
+          <div class="field-label" style="margin-top:6px">Ekhonkar option gulo (tap kore delete)</div>
+          <div id="checklistManageList" class="chip-wrap"></div>
+        </div>
+
+        <div class="section-head"><h3>Gato 7 din</h3></div>
+        <div id="checklistHistory" class="week-strip"></div>
+      </section>
+
+      <!-- ============ CHECK-IN ============ -->
+      <section class="view hidden" data-view="checkin">
+        <div class="input-card">
+          <div class="field-label" id="checkinKindLabel">Aajker check-in</div>
+          <form id="checkinForm">
+            <div id="checkinQuestions"></div>
+            <button type="submit" class="btn btn-primary btn-block">Check-in save</button>
+          </form>
+        </div>
+        <div class="section-head"><h3>Ager check-in</h3></div>
+        <div id="checkinList" class="list"></div>
+      </section>
+
+      <!-- ============ NOTES ============ -->
+      <section class="view hidden" data-view="notes">
+        <form id="noteForm" class="input-card">
+          <textarea id="noteText" rows="3" placeholder="Ja mone rakhte chao lekho…" required></textarea>
+          <button type="submit" class="btn btn-primary btn-block">Note save</button>
+        </form>
+        <input type="search" id="noteSearch" class="search" placeholder="🔍 Note khojo…" />
+        <div id="noteList" class="list"></div>
+      </section>
+
+      <!-- ============ PINS (wake cards) ============ -->
+      <section class="view hidden" data-view="pins">
+        <p class="lead">Ekhane pin kora jinis <b>ghum theke uthe</b> tomake dekhabo — dua, niyom, reminder.</p>
+        <form id="pinForm" class="input-card">
+          <div class="seg" id="pinCatSeg">
+            <button type="button" class="seg-btn active" data-cat="dua">🤲 Dua</button>
+            <button type="button" class="seg-btn" data-cat="rule">📏 Niyom</button>
+            <button type="button" class="seg-btn" data-cat="reminder">💡 Reminder</button>
+            <button type="button" class="seg-btn" data-cat="custom">＋ Custom</button>
+          </div>
+          <input type="text" id="pinCustomCat" class="hidden" placeholder="Category-r naam (jemon: Goal)" autocomplete="off" />
+          <input type="text" id="pinTitle" placeholder="Shironam (optional)" autocomplete="off" />
+          <textarea id="pinText" rows="2" placeholder="Lekha… (jemon uthar dua, ba niyom)" required></textarea>
+          <label class="switch-row">
+            <span>Uthe dekhabo?</span>
+            <input type="checkbox" id="pinWake" checked />
+          </label>
+          <button type="submit" class="btn btn-primary btn-block">Pin koro</button>
+        </form>
+        <div id="pinList" class="list"></div>
+      </section>
+    </main>
+
+    <nav class="bottomnav">
+      <button class="nav-btn active" data-nav="home"><span class="nav-ico">🏠</span><span>Aaj</span></button>
+      <button class="nav-btn" data-nav="tasks"><span class="nav-ico">✅</span><span>Kaj</span></button>
+      <button class="nav-btn nav-sleep" data-nav="sleep"><span class="nav-ico">🌙</span><span>Ghum</span></button>
+      <button class="nav-btn" data-nav="checklist"><span class="nav-ico">📋</span><span>Checklist</span></button>
+      <button class="nav-btn" data-nav="more"><span class="nav-ico">⋯</span><span>Aro</span></button>
+    </nav>
+  </div>
+
+  <!-- ============ MORE SHEET ============ -->
+  <div id="moreSheet" class="sheet hidden">
+    <div class="sheet-backdrop" data-close="more"></div>
+    <div class="sheet-body">
+      <div class="sheet-handle"></div>
+      <h3 class="sheet-title">Aro</h3>
+      <button class="sheet-item" data-goto="checkin"><span>📝</span><div><b>Check-in</b><small>Shokal / rater mood o bhabna</small></div></button>
+      <button class="sheet-item" data-goto="notes"><span>💡</span><div><b>Notes</b><small>Likhe rakho, khoje ber koro</small></div></button>
+      <button class="sheet-item" data-goto="pins"><span>🤲</span><div><b>Uthe ja dekhbo</b><small>Dua, niyom, reminder pin koro</small></div></button>
+      <button class="sheet-item" id="openChatBtn"><span>✨</span><div><b>Persona AI</b><small>Chat e bolo, ami kore dibo</small></div></button>
+      <button class="sheet-item" id="alarmSettingsBtn"><span>⏰</span><div><b>Alarm &amp; ringtone</b><small>Awaj, vibration, snooze — test koro</small></div></button>
+      <button class="sheet-item" id="exportBtn"><span>⬇️</span><div><b>Backup neya</b><small>Sob data file e save koro</small></div></button>
+      <button class="sheet-item" id="importBtn"><span>⬆️</span><div><b>Backup fera</b><small>File theke data restore koro</small></div></button>
+      <input type="file" id="importFile" accept="application/json" class="hidden" />
+    </div>
+  </div>
+
+  <!-- ============ SLEEP MODE (night) ============ -->
+  <div id="sleepMode" class="fullscreen hidden">
+    <div class="night-aurora"></div>
+    <div class="stars" id="stars"></div>
+    <div class="sleep-mode-inner">
+      <div class="sm-eyebrow">Ghumacche…</div>
+      <div class="sm-timer" id="smTimer">0:00:00</div>
+      <div class="sm-start" id="smStart"></div>
+      <div class="sm-hint">Shundor ghum hok 🌙<br>Uthe niche button-e tap koro</div>
+      <button id="wakeBtn" class="btn btn-wake">Uthe gechi ☀️</button>
+      <button id="cancelSleepBtn" class="btn btn-ghost btn-block sm-cancel">Batil koro</button>
+    </div>
+  </div>
+
+  <!-- ============ WAKE MODE (dawn) ============ -->
+  <div id="wakeMode" class="fullscreen hidden">
+    <div class="dawn-aurora"></div>
+    <div class="wake-inner">
+      <div class="wake-sun">☀️</div>
+      <div class="wake-greet">Shuprobhat!</div>
+      <div class="wake-slept" id="wakeSlept"></div>
+      <div class="wake-cards" id="wakeCards"></div>
+      <button id="startDayBtn" class="btn btn-primary btn-block wake-start">Din shuru koro →</button>
+    </div>
+  </div>
+
+  <!-- ============ ALARM SETTINGS ============ -->
+  <div id="alarmSheet" class="sheet hidden">
+    <div class="sheet-backdrop" data-close="alarm"></div>
+    <div class="sheet-body">
+      <div class="sheet-handle"></div>
+      <h3 class="sheet-title">Alarm &amp; ringtone</h3>
+
+      <div class="field-label">Ringtone (tap korle bajiye dekhabo)</div>
+      <div id="toneList" class="tone-list"></div>
+
+      <div class="field-label" style="margin-top:14px">Awajer jor — <span id="alarmVolVal">80%</span></div>
+      <input type="range" id="alarmVol" min="0" max="100" step="5" class="range" />
+
+      <label class="switch-row"><span>Vibration</span><input type="checkbox" id="alarmVibrate" /></label>
+      <label class="switch-row"><span>Fullscreen alarm popup</span><input type="checkbox" id="alarmPopup" /></label>
+
+      <div class="input-row" style="margin-top:8px">
+        <div class="field-label" style="flex:1">Snooze koto min?</div>
+        <input type="number" id="alarmSnooze" min="1" max="60" class="mini-num" />
+      </div>
+
+      <div id="alarmSupport" class="alarm-support"></div>
+
+      <button class="btn btn-primary btn-block" id="alarmTestBtn">▶ Ekhoni bajiye dekho</button>
+      <button class="btn btn-soft btn-block" id="alarmTest1minBtn" style="margin-top:8px">⏱ 1 min porer asol test reminder</button>
+      <button class="btn btn-ghost btn-block" data-close="alarm" style="margin-top:8px">Bondho</button>
+    </div>
+  </div>
+
+  <!-- ============ ALARM RINGING ============ -->
+  <div id="alarmMode" class="fullscreen hidden">
+    <div class="alarm-aurora"></div>
+    <div class="alarm-inner">
+      <div class="alarm-bell">⏰</div>
+      <div class="alarm-eyebrow">Kaj-er shomoy holo</div>
+      <div class="alarm-title" id="alarmTitle"></div>
+      <div class="alarm-time" id="alarmTime"></div>
+      <button class="btn btn-primary btn-block alarm-btn" id="alarmDoneBtn">✅ Kore felechi</button>
+      <button class="btn btn-soft btn-block alarm-btn" id="alarmSnoozeBtn">5 min por abar</button>
+      <button class="btn btn-ghost btn-block alarm-btn" id="alarmDismissBtn">Bondho koro</button>
+    </div>
+  </div>
+
+  <!-- ============ CHAT HEAD ============ -->
+  <button id="chatHead" class="chat-head" type="button" aria-label="Persona AI chat">
+    <span class="chat-head-glow"></span>
+    <span class="chat-head-ico">✨</span>
+  </button>
+
+  <!-- ============ CHAT PANEL ============ -->
+  <div id="chatPanel" class="chat-panel hidden">
+    <div class="chat-aurora" aria-hidden="true"></div>
+
+    <header class="chat-top">
+      <div class="chat-avatar">✨</div>
+      <div class="chat-who">
+        <b>Persona AI</b>
+        <span id="chatModeTag" class="chat-mode-tag">Offline brain</span>
+      </div>
+      <button id="chatGear" class="icon-btn chat-icon" title="Setting" aria-label="Setting">⚙️</button>
+      <button id="chatClose" class="icon-btn chat-icon" title="Bondho" aria-label="Bondho">✕</button>
+    </header>
+
+    <!-- AI settings -->
+    <div id="chatSettings" class="chat-settings hidden">
+      <label class="switch-row">
+        <span>AI mode (nijer Gemini key)</span>
+        <input type="checkbox" id="aiToggle" />
+      </label>
+      <input type="password" id="aiKey" placeholder="Gemini API key (aistudio.google.com)" autocomplete="off" />
+      <input type="text" id="aiModel" placeholder="gemini-2.5-flash" autocomplete="off" />
+      <p class="chat-settings-note">
+        Key ta shudhu ei phone-er localStorage e thake, kothao pathai na. Off thakle ba net na thakle
+        offline brain-i sob kaj kore.
+      </p>
+      <button id="chatClear" class="btn btn-ghost btn-block">Chat history muche felo</button>
+    </div>
+
+    <div id="chatBody" class="chat-body"></div>
+
+    <div id="chatTyping" class="chat-typing hidden"><span></span><span></span><span></span></div>
+    <div id="chatChips" class="chat-chips"></div>
+
+    <form id="chatForm" class="chat-composer">
+      <input type="text" id="chatInput" placeholder="Ja korte hobe likhe dao…" autocomplete="off" />
+      <button type="submit" class="chat-send" aria-label="Pathao">➤</button>
+    </form>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+  <script src="app.js"></script>
+  <script src="alarm.js"></script>
+  <script src="chat.js"></script>
+</body>
+</html>

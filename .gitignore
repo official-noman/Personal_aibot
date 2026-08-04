@@ -1,0 +1,11 @@
+# local-only Claude Code settings
+.claude/settings.local.json
+
+# deps / build (ei project e build step nei, tobu bhul kore jate na dhoke)
+node_modules/
+dist/
+*.log
+
+# OS junk
+.DS_Store
+Thumbs.db
