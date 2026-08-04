@@ -43,7 +43,7 @@ let RAG = {
     RAG.loading = true;
     try {
       if (typeof window.pipeline === 'undefined') {
-        const { pipeline, env } = await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2');
+        const { pipeline, env } = await import('https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/+esm');
         // allow local caching
         env.allowLocalModels = false;
         window.pipeline = pipeline;
@@ -146,16 +146,25 @@ const MEMORY_ACTIONS = {
   async save_memory({ fact }) {
     if (!fact) return { text: "Ki kotha mone rakhbo seta to bolla na!" };
     
-    // We show a typing state while model loads if not ready
-    if (!RAG.ready && !RAG.loading) {
-      toast("🧠 AI Brain model download hocche (1st time only)...");
+    if (!RAG.ready) {
+      // Run background save and return immediately to not block chat
+      setTimeout(async () => {
+        try {
+          const ok = await RAG.saveMemory(fact);
+          if (ok && typeof pushMsg === 'function') pushMsg('b', `🧠 Brain update done! Mone rakhlam: "${fact}"`);
+        } catch(e) {
+          if (typeof pushMsg === 'function') pushMsg('b', '⚠️ Memory save korte somossa hoyeche (Net check koro).');
+        }
+      }, 100);
+      return { text: `⏳ AI Brain first time setup hocche (25MB model download hobe)... Save hole janabo!` };
     }
 
-    const ok = await RAG.saveMemory(fact);
-    if (ok) {
-      return { text: `🧠 Mone rakhlam: "${fact}"` };
-    } else {
+    try {
+      const ok = await RAG.saveMemory(fact);
+      if (ok) return { text: `🧠 Mone rakhlam: "${fact}"` };
       return { text: `Sorry, memory save korte problem hoyeche.` };
+    } catch(e) {
+      return { text: `Model error: ${e.message}` };
     }
   }
 };
