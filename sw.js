@@ -1,5 +1,5 @@
 /* Persona service worker — offline caching + notification clicks */
-const CACHE = 'persona-v10';
+const CACHE = 'persona-v11';
 const ASSETS = [
   './',
   './index.html',

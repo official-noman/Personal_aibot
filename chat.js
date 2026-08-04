@@ -828,6 +828,16 @@ async function handleUserText(raw) {
       }
     }
     const intent = parseIntent(text);
+    
+    /* offline RAG memory recall (no LLM required) */
+    if (intent.action === '_unknown' && typeof RAG !== 'undefined' && RAG.ready) {
+       const mems = await RAG.search(text, 1);
+       if (mems.length > 0 && mems[0].score > 0.5) {
+          pushMsg('b', `🧠 Amar joto dur mone pore:\n"${mems[0].text}"`);
+          return;
+       }
+    }
+
     const r = await runAction(intent.action, intent.args);
     if (!r.silent) pushMsg('b', r.text, { chips: r.chips || [], goto: r.goto, link: r.link });
   } finally {
