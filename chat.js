@@ -507,6 +507,7 @@ const KW = {
   geoDel: ['geo delete', 'geo muche', 'geo bad', 'geo remove', 'radar muche', 'radar baad'],
   geoOn: ['location on', 'location chalu', 'geo on', 'geo chalu', 'tracking on', 'tracking chalu', 'radar on'],
   geoOff: ['location off', 'location bondho', 'geo off', 'geo bondho', 'tracking off', 'tracking bondho', 'radar off'],
+  saveMem: ['mone rakho', 'mone rakh', 'memory add', 'save memory', 'remember that', 'remember', 'মনে রাখো'],
 };
 const MOOD_WORDS = [
   { k: ['khub kharap', 'জঘন্য', 'terrible', 'awful'], v: 0 },
@@ -607,6 +608,7 @@ function parseIntent(raw) {
   if (hasAny(t, KW.stats)) return { action: 'stats_today', args: {}, sure: true };
 
   /* ---- note ---- */
+  if (hasAny(t, KW.saveMem)) return { action: 'save_memory', args: { fact: after(raw, KW.saveMem) || raw }, sure: true };
   if (hasAny(t, KW.noteFind)) return { action: 'note_search', args: { query: after(raw, KW.noteFind) }, sure: true };
   if (hasAny(t, KW.note)) return { action: 'note_add', args: { text: after(raw, KW.note) || raw }, sure: true };
 
