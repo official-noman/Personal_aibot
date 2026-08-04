@@ -1,5 +1,5 @@
 /* Persona service worker — offline caching + notification clicks */
-const CACHE = 'persona-v8';
+const CACHE = 'persona-v9';
 const ASSETS = [
   './',
   './index.html',
@@ -33,7 +33,7 @@ self.addEventListener('fetch', (e) => {
   e.respondWith(
     caches.match(e.request).then((cached) =>
       cached ||
-      fetch(e.request).catch(() => caches.match('./index.html'))
+      fetch(e.request).catch(() => caches.match('./'))
     )
   );
 });
@@ -48,7 +48,7 @@ self.addEventListener('notificationclick', (e) => {
       for (const c of cs) {
         if ('focus' in c) { c.postMessage({ type: 'alarm-click', taskId }); return c.focus(); }
       }
-      if (self.clients.openWindow) return self.clients.openWindow('./index.html?alarm=' + (taskId || ''));
+      if (self.clients.openWindow) return self.clients.openWindow('./?alarm=' + (taskId || ''));
     })
   );
 });

@@ -2,7 +2,7 @@
   "name": "Persona — Personal Assistant",
   "short_name": "Persona",
   "description": "Tomar daily kaj, ghum, check-in ar notes — sob ek jaygay.",
-  "start_url": "./index.html",
+  "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
@@ -20,18 +20,18 @@
       "name": "AI Chat",
       "short_name": "Chat",
       "description": "Bolo, ami kore dibo",
-      "url": "./index.html?chat=1",
+      "url": "./?chat=1",
       "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
     },
     {
       "name": "Ghumate jachhi",
       "short_name": "Ghum",
-      "url": "./index.html?do=sleep",
+      "url": "./?do=sleep",
       "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }]
     }
   ],
   "share_target": {
-    "action": "./index.html",
+    "action": "./",
     "method": "GET",
     "params": { "title": "title", "text": "text", "url": "url" }
   }
