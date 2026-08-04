@@ -830,10 +830,10 @@ async function handleUserText(raw) {
     const intent = parseIntent(text);
     
     /* offline RAG memory recall (no LLM required) */
-    if (intent.action === '_unknown' && typeof RAG !== 'undefined' && RAG.ready) {
+    if ((intent.action === '_unknown' || intent.action === 'web_answer') && typeof RAG !== 'undefined' && RAG.ready) {
        const mems = await RAG.search(text, 1);
-       if (mems.length > 0 && mems[0].score > 0.5) {
-          pushMsg('b', `🧠 Amar joto dur mone pore:\n"${mems[0].text}"`);
+       if (mems.length > 0 && mems[0].score > 0.4) {
+          pushMsg('b', `🧠 Amar memory theke:\n"${mems[0].text}"`);
           return;
        }
     }
