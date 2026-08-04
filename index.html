@@ -174,6 +174,25 @@
         <div id="noteList" class="list"></div>
       </section>
 
+      <!-- ============ SHEET / DATE-TIME LOG ============ -->
+      <section class="view hidden" data-view="sheet">
+        <form id="sheetForm" class="input-card">
+          <div class="field-label">Excel/Sheet style row</div>
+          <input type="datetime-local" id="sheetTime" aria-label="Tarikh o shomoy" />
+          <input type="text" id="sheetTitle" placeholder="Title / kaj / entry" autocomplete="off" />
+          <textarea id="sheetNote" rows="3" placeholder="Details / note…" ></textarea>
+          <div class="input-row">
+            <input type="text" id="sheetCat" placeholder="Category (optional)" autocomplete="off" />
+            <button type="submit" class="btn btn-primary">Save</button>
+          </div>
+        </form>
+        <div class="sheet-tools">
+          <input type="search" id="sheetSearch" class="search" placeholder="🔍 Sheet khojo…" />
+          <span id="sheetCount" class="sheet-count">0 row</span>
+        </div>
+        <div id="sheetList" class="sheet-list"></div>
+      </section>
+
       <!-- ============ PINS (wake cards) ============ -->
       <section class="view hidden" data-view="pins">
         <p class="lead">Ekhane pin kora jinis <b>ghum theke uthe</b> tomake dekhabo — dua, niyom, reminder.</p>
@@ -264,6 +283,7 @@
       <h3 class="sheet-title">Aro</h3>
       <button class="sheet-item" data-goto="checkin"><span>📝</span><div><b>Check-in</b><small>Shokal / rater mood o bhabna</small></div></button>
       <button class="sheet-item" data-goto="notes"><span>💡</span><div><b>Notes</b><small>Likhe rakho, khoje ber koro</small></div></button>
+      <button class="sheet-item" data-goto="sheet"><span>📊</span><div><b>Sheet</b><small>Date-time onujayi entry rakho</small></div></button>
       <button class="sheet-item" data-goto="pins"><span>🤲</span><div><b>Uthe ja dekhbo</b><small>Dua, niyom, reminder pin koro</small></div></button>
       <button class="sheet-item" id="openChatBtn"><span>✨</span><div><b>Persona AI</b><small>Chat e bolo, ami kore dibo</small></div></button>
       <button class="sheet-item" id="geoNavBtn"><span>📍</span><div><b>Radars</b><small>Jaygay gele reminder — geo-fencing</small></div></button>

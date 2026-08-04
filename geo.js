@@ -138,10 +138,9 @@ function fireGeoNotif(gt, dist) {
   /* vibration (haptic premium feel) */
   if (navigator.vibrate && geoCfg.sound) navigator.vibrate([200, 100, 200, 100, 200]);
 
-  /* in-app alarm sound (reuse alarm engine) */
-  if (typeof playSeq === 'function' && geoCfg.sound) {
-    playSeq('chime', 0.6);
-  }
+  /* in-app fullscreen alarm + ringtone (app foreground/background e thakle) */
+  if (typeof fireLocationAlarm === 'function') fireLocationAlarm(gt, dist);
+  else if (typeof playSeq === 'function' && geoCfg.sound) playSeq('chime', 0.6);
 
   /* toast in app */
   toast(`📍 ${gt.label} — ${gt.placeName || ''} er kachhe!`);

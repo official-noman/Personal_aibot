@@ -15,6 +15,7 @@ let sleeps      = DB.get('sleeps', []);
 let activeSleep = DB.get('activeSleep', null);      // { start: iso } | null
 let checkins    = DB.get('checkins', []);
 let notes       = DB.get('notes', []);
+let sheetRows   = DB.get('sheetRows', []);
 let pins        = DB.get('pins', []);               // { id, cat, title, text, wake, ts }
 let clItems     = DB.get('clItems', defaultChecklist());
 let clLog       = DB.get('clLog', {});              // { 'YYYY-MM-DD': [itemId] }
@@ -25,6 +26,7 @@ const save = {
   active: () => DB.set('activeSleep', activeSleep),
   checkins: () => DB.set('checkins', checkins),
   notes: () => DB.set('notes', notes),
+  sheetRows: () => DB.set('sheetRows', sheetRows),
   pins: () => DB.set('pins', pins),
   clItems: () => DB.set('clItems', clItems),
   clLog: () => DB.set('clLog', clLog),
@@ -65,8 +67,8 @@ function humanDur(hrs) {
 /* ============================================================
    NAVIGATION
    ============================================================ */
-const TITLES = { home: 'Aaj', tasks: 'Kaj', sleep: 'Ghum', checklist: 'Checklist', checkin: 'Check-in', notes: 'Notes', pins: 'Uthe ja dekhbo' };
-const EYEBROWS = { home: 'Persona', tasks: 'Ki korte hobe', sleep: 'Bishram', checklist: 'Aajker obhyash', checkin: 'Nijer shathe', notes: 'Mone rakho', pins: 'Ghum theke uthe' };
+const TITLES = { home: 'Aaj', tasks: 'Kaj', sleep: 'Ghum', checklist: 'Checklist', checkin: 'Check-in', notes: 'Notes', sheet: 'Sheet', pins: 'Uthe ja dekhbo' };
+const EYEBROWS = { home: 'Persona', tasks: 'Ki korte hobe', sleep: 'Bishram', checklist: 'Aajker obhyash', checkin: 'Nijer shathe', notes: 'Mone rakho', sheet: 'Date-time log', pins: 'Ghum theke uthe' };
 let currentView = 'home';
 
 function navTo(view) {
@@ -82,7 +84,7 @@ function navTo(view) {
 }
 function render(view) {
   ({ home: renderHome, tasks: renderTasks, sleep: renderSleep, checklist: renderChecklist,
-     checkin: renderCheckin, notes: renderNotes, pins: renderPins }[view] || (() => {}))();
+     checkin: renderCheckin, notes: renderNotes, sheet: renderSheet, pins: renderPins }[view] || (() => {}))();
 }
 $$('.nav-btn').forEach(b => b.onclick = () => navTo(b.dataset.nav));
 document.addEventListener('click', e => {
@@ -501,6 +503,50 @@ $('#noteForm').onsubmit = e => {
 $('#noteSearch').addEventListener('input', e => { noteQuery = e.target.value; renderNotes(); });
 
 /* ============================================================
+   SHEET / DATE-TIME LOG
+   ============================================================ */
+let sheetQuery = '';
+function addSheetRow({ when, title, note, cat }) {
+  const iso = when ? new Date(when).toISOString() : new Date().toISOString();
+  sheetRows.push({ id: uid(), when: iso, title: (title || '').trim(), note: (note || '').trim(), cat: (cat || 'General').trim(), ts: Date.now() });
+  save.sheetRows();
+}
+function renderSheet() {
+  const box = $('#sheetList');
+  let list = [...sheetRows].sort((a, b) => new Date(b.when) - new Date(a.when) || b.ts - a.ts);
+  if (sheetQuery) {
+    const q = sheetQuery.toLowerCase();
+    list = list.filter(r => [r.title, r.note, r.cat].some(v => String(v || '').toLowerCase().includes(q)));
+  }
+  $('#sheetCount').textContent = `${list.length} row`;
+  box.innerHTML = list.length ? list.map(r => `
+    <div class="sheet-row" data-id="${r.id}">
+      <div class="sheet-date">${esc(new Date(r.when).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: '2-digit', hour: 'numeric', minute: '2-digit', hour12: true }))}</div>
+      <div class="sheet-main">
+        <div class="sheet-title">${esc(r.title || 'Untitled')}</div>
+        ${r.note ? `<div class="sheet-note">${esc(r.note)}</div>` : ''}
+      </div>
+      <div class="sheet-cat">${esc(r.cat || 'General')}</div>
+      <button class="del" data-act="del">🗑</button>
+    </div>`).join('') : `<div class="empty">${sheetQuery ? 'Kichu pawa gelo na.' : 'Ekhono kono sheet row nei.'}</div>`;
+  $$('#sheetList .sheet-row').forEach(el => el.querySelector('[data-act="del"]').onclick = () => {
+    sheetRows = sheetRows.filter(x => x.id !== el.dataset.id);
+    save.sheetRows(); renderSheet(); toast('Row muche gelo');
+  });
+}
+$('#sheetForm').onsubmit = e => {
+  e.preventDefault();
+  const title = $('#sheetTitle').value.trim();
+  const note = $('#sheetNote').value.trim();
+  if (!title && !note) return;
+  addSheetRow({ when: $('#sheetTime').value || new Date(), title, note, cat: $('#sheetCat').value || 'General' });
+  e.target.reset();
+  toast('Sheet row save holo');
+  renderSheet();
+};
+$('#sheetSearch').addEventListener('input', e => { sheetQuery = e.target.value; renderSheet(); });
+
+/* ============================================================
    PINS (wake cards)
    ============================================================ */
 let pinCat = 'dua';
@@ -546,7 +592,7 @@ $('#pinForm').onsubmit = e => {
    BACKUP
    ============================================================ */
 $('#exportBtn').onclick = () => {
-  const data = { tasks, sleeps, checkins, notes, pins, clItems, clLog, _v: 2, _at: new Date().toISOString() };
+  const data = { tasks, sleeps, checkins, notes, sheetRows, pins, clItems, clLog, _v: 3, _at: new Date().toISOString() };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
@@ -562,7 +608,7 @@ $('#importFile').onchange = e => {
     try {
       const d = JSON.parse(r.result);
       tasks = d.tasks || []; sleeps = d.sleeps || []; checkins = d.checkins || [];
-      notes = d.notes || []; pins = d.pins || []; clItems = d.clItems || defaultChecklist(); clLog = d.clLog || {};
+      notes = d.notes || []; sheetRows = d.sheetRows || []; pins = d.pins || []; clItems = d.clItems || defaultChecklist(); clLog = d.clLog || {};
       Object.values(save).forEach(fn => fn());
       closeSheet(); navTo('home'); toast('Backup restore holo ✅');
     } catch (err) { toast('File porte parlam na'); }

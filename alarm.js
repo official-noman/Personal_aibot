@@ -119,13 +119,28 @@ function fireAlarm(task) {
   $('#alarmTitle').textContent = task.title;
   $('#alarmTime').textContent = task.due ? fmtDue(task.due) : '';
   $('#alarmSnoozeBtn').textContent = `${alarmCfg.snooze} min por abar`;
+  $('#alarmDoneBtn').textContent = task.external ? 'Bujhlam' : '✅ Kore felechi';
   $('#alarmMode').classList.remove('hidden');
   startRinging();
+}
+
+function fireLocationAlarm(gt, dist) {
+  const task = {
+    id: 'geo-' + gt.id,
+    title: `${gt.label}${gt.placeName ? ' · ' + gt.placeName : ''}`,
+    due: new Date().toISOString(),
+    external: 'geo',
+    geoId: gt.id,
+  };
+  fireAlarm(task);
+  $('#alarmTime').textContent = `Location alarm${dist != null ? ' · ' + dist + 'm dure' : ''}`;
+  $('#alarmSnoozeBtn').textContent = 'Abar allow koro';
 }
 
 function dismissAlarm() {
   stopRinging();
   $('#alarmMode').classList.add('hidden');
+  $('#alarmDoneBtn').textContent = '✅ Kore felechi';
   ringingTask = null;
 }
 function snoozeAlarm() {
@@ -133,7 +148,14 @@ function snoozeAlarm() {
   dismissAlarm();
   if (!t) return;
   const task = tasks.find(x => x.id === t.id);
-  if (!task) return;
+  if (!task) {
+    if (t.external === 'geo') {
+      const gt = typeof geoTasks !== 'undefined' && geoTasks.find(x => x.id === t.geoId);
+      if (gt) { gt.notified = null; saveGeo(); }
+      toast('Ei location alarm abar active holo');
+    }
+    return;
+  }
   task.due = new Date(Date.now() + (alarmCfg.snooze || 5) * 60000).toISOString();
   task.notified = false;
   save.tasks(); render(currentView); syncScheduledAlarms();
@@ -142,7 +164,8 @@ function snoozeAlarm() {
 function completeFromAlarm() {
   const t = ringingTask;
   dismissAlarm();
-  if (t) { toggleTask(t.id); toast('✅ Shesh kore dilam'); }
+  if (t && !t.external) { toggleTask(t.id); toast('✅ Shesh kore dilam'); }
+  else if (t && t.external === 'geo') toast('Location alarm bondho holo');
 }
 
 /* ============================================================

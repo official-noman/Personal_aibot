@@ -329,6 +329,22 @@ const ACTIONS = {
     return { text: `${list.length} ta note pelam:\n${list.slice(0, 5).map(n => '• ' + n.text).join('\n')}`, goto: 'notes' };
   },
 
+  sheet_add({ title, note, when, cat }) {
+    if (!title && !note) return { text: 'Sheet e ki save korbo? Title ba note ta bolo.' };
+    addSheetRow({ title: title || note, note: note || '', when: when || new Date(), cat: cat || 'General' });
+    refresh();
+    const last = sheetRows[sheetRows.length - 1];
+    return { text: `📊 Sheet e save holo:\n**${last.title || 'Untitled'}**\n${fmtDue(last.when)} · ${last.cat}`, goto: 'sheet' };
+  },
+
+  sheet_list({ query }) {
+    const q = norm(query || '');
+    let list = [...sheetRows].sort((a, b) => new Date(b.when) - new Date(a.when));
+    if (q) list = list.filter(r => norm([r.title, r.note, r.cat].join(' ')).includes(q));
+    if (!list.length) return { text: q ? `"${query}" niye sheet row pelam na.` : 'Sheet e ekhono kono row nei.', goto: 'sheet' };
+    return { text: `${list.length} ta sheet row:\n${list.slice(0, 6).map(r => `• ${fmtDue(r.when)} — ${r.title || r.note}`).join('\n')}`, goto: 'sheet' };
+  },
+
   pin_add({ text, cat, title, wake }) {
     if (!text || !text.trim()) return { text: 'Ki pin korbo? Lekha ta dao.' };
     pins.push({ id: uid(), cat: cat || 'reminder', title: title || '', text: text.trim(), wake: wake !== false, ts: Date.now() });
@@ -360,7 +376,7 @@ const ACTIONS = {
   backup_export() { $('#exportBtn').click(); return { text: '⬇️ Backup file download hocche.' }; },
 
   navigate({ view }) {
-    const v = { home: 'home', tasks: 'tasks', sleep: 'sleep', checklist: 'checklist', checkin: 'checkin', notes: 'notes', pins: 'pins', geo: 'geo' }[view];
+    const v = { home: 'home', tasks: 'tasks', sleep: 'sleep', checklist: 'checklist', checkin: 'checkin', notes: 'notes', sheet: 'sheet', pins: 'pins', geo: 'geo' }[view];
     if (!v) return { text: 'Kon page e jabo bujhi nai.' };
     if (v === 'geo' && typeof openGeoView === 'function') { closeChat(); openGeoView(); return { text: 'Radar page e niye gelam.', silent: true }; }
     closeChat(); navTo(v);
@@ -402,8 +418,8 @@ const ACTIONS = {
 
   help() {
     return {
-      text: `Ami ja ja korte pari — just likhe dao:\n• **Kaj**: "kal bikel 5 tay bazar korte hobe", "bazar ta done", "ki ki kaj baki"\n• **Ghum**: "ghumate jachhi", "uthe gechi", "kal 7 ghonta ghumiyechi"\n• **Checklist**: "namaz porechi", "checklist e boi pora add koro"\n• **Note**: "likhe rakho — ammar oshudh kena lagbe"\n• **Pin**: "pin koro uthar dua ..."\n• **Check-in**: "mood bhalo aaj", "aaj kemon gelo"\n• **📍 Geo**: "Dhanmondi gele boi kinte mone koriyo", "radar dekhao"`,
-      chips: ['Ki ki kaj baki', 'Aaj kemon gelo', 'Ghumate jachhi', 'Radar dekhao'],
+      text: `Ami ja ja korte pari — clear format e likhle mismatch kom hoy:\n• **Kaj/alarm**: "kal bikel 5 tay bazar korte hobe"\n• **Sheet**: "sheet e save koro: 5 Aug 8pm client call - payment follow-up"\n• **Note**: "likhe rakho — ammar oshudh kena lagbe"\n• **Geo alarm**: "Dhanmondi gele boi kinte mone koriyo"\n• **Correct**: vul add hole "oi kaj ta delete" ba same kaj abar correct time diye bolo\n• **Dekhao**: "ki ki kaj baki", "sheet dekhao", "radar dekhao"`,
+      chips: ['Sheet dekhao', 'Ki ki kaj baki', 'Radar dekhao', 'Help'],
     };
   },
 };
@@ -495,6 +511,8 @@ const KW = {
   sleepStat: ['koto ghum', 'ghum koto', 'ghumer hisheb', 'ghum stat', 'ghum kemon'],
   note: ['likhe rakho', 'likhe rakh', 'note koro', 'note rakho', 'mone rakho', 'note kore rakho', 'লিখে রাখো', 'নোট'],
   noteFind: ['note khojo', 'note khoj', 'note ache', 'note e ki'],
+  sheetAdd: ['sheet e save', 'sheet e rakho', 'sheet add', 'sheet e add', 'log koro', 'entry rakho', 'row add'],
+  sheetList: ['sheet dekhao', 'sheet list', 'sheet kholo', 'log dekhao', 'entry dekhao'],
   pin: ['pin koro', 'pin kore rakho', 'uthe dekhabo', 'uthe dekhte chai', 'pin kor'],
   clAdd: ['checklist e add', 'checklist add', 'option add', 'checklist e notun', 'obhyash add'],
   clStat: ['checklist kemon', 'checklist dekhao', 'checklist status', 'aajker checklist', 'ki ki korlam'],
@@ -610,6 +628,13 @@ function parseIntent(raw) {
   /* ---- note ---- */
   if (hasAny(t, KW.saveMem)) return { action: 'save_memory', args: { fact: after(raw, KW.saveMem) || raw }, sure: true };
   if (hasAny(t, KW.noteFind)) return { action: 'note_search', args: { query: after(raw, KW.noteFind) }, sure: true };
+  if (hasAny(t, KW.sheetList)) return { action: 'sheet_list', args: { query: after(raw, KW.sheetList) }, sure: true };
+  if (hasAny(t, KW.sheetAdd)) {
+    const w = parseWhen(raw);
+    const body = after(raw, KW.sheetAdd) || cleanTitle(raw, w.hits) || raw;
+    const [title, ...rest] = body.split(/\s+-\s+|:/);
+    return { action: 'sheet_add', args: { title: (title || body).trim(), note: rest.join(' - ').trim(), when: w.when ? w.when.toISOString() : null }, sure: true };
+  }
   if (hasAny(t, KW.note)) return { action: 'note_add', args: { text: after(raw, KW.note) || raw }, sure: true };
 
   /* ---- pin ---- */
@@ -647,7 +672,7 @@ function parseIntent(raw) {
     return { action: 'checkin_save', args: { mood: mood.v, text: raw }, sure: true };
   }
   /* navigation */
-  const navHit = { home: ['home e', 'aaj dekhao'], tasks: ['kaj er page', 'task page'], sleep: ['ghum page', 'ghum dekhao'], checklist: ['checklist page'], notes: ['note dekhao', 'notes dekhao'], pins: ['pin dekhao'], checkin: ['check in dekhao', 'checkin dekhao'], geo: ['radar page', 'radar dekhao', 'geo page', 'geo dekhao', 'location page'] };
+  const navHit = { home: ['home e', 'aaj dekhao'], tasks: ['kaj er page', 'task page'], sleep: ['ghum page', 'ghum dekhao'], checklist: ['checklist page'], notes: ['note dekhao', 'notes dekhao'], sheet: ['sheet page', 'sheet dekhao', 'log page'], pins: ['pin dekhao'], checkin: ['check in dekhao', 'checkin dekhao'], geo: ['radar page', 'radar dekhao', 'geo page', 'geo dekhao', 'location page'] };
   for (const [v, keys] of Object.entries(navHit)) if (hasAny(t, keys)) return { action: 'navigate', args: { view: v }, sure: true };
 
   /* ---- geo / location reminder ---- */
@@ -741,9 +766,10 @@ task_done{query:string}       task_delete{query:string}      task_list{}
 sleep_start{}  sleep_end{}    sleep_log{hours:number, date?:YYYY-MM-DD}   sleep_stats{}
 checklist_toggle{query:string}  checklist_add{label:string, emoji?:string}  checklist_status{}
 note_add{text:string}   note_search{query:string}
+sheet_add{title:string, note?:string, when?:ISO datetime, cat?:string}  sheet_list{query?:string}
 pin_add{text:string, cat?:"dua"|"rule"|"reminder", title?:string, wake?:boolean}
 checkin_save{mood:0..4, text?:string}
-stats_today{}  backup_export{}  navigate{view:"home"|"tasks"|"sleep"|"checklist"|"checkin"|"notes"|"pins"|"geo"}  help{}
+stats_today{}  backup_export{}  navigate{view:"home"|"tasks"|"sleep"|"checklist"|"checkin"|"notes"|"sheet"|"pins"|"geo"}  help{}
 geo_add{label:string, place:string, radius?:number}  geo_list{}  geo_delete{query:string}  geo_enable{}  geo_disable{}
 save_memory{fact:string}`;
 
@@ -756,7 +782,7 @@ function stateSummary() {
     `Checklist option: ${clItems.map(i => i.label + (doneIds.has(i.id) ? ' [aaj done]' : '')).join(', ') || 'nei'}`,
     `Ghum cholche: ${activeSleep ? 'ha, shuru ' + activeSleep.start : 'na'}`,
     `Shesh ghum: ${[...sleeps].sort((a, b) => b.date.localeCompare(a.date))[0]?.hours ?? '-'} h`,
-    `Note count: ${notes.length}, Pin count: ${pins.length}`,
+    `Note count: ${notes.length}, Sheet row: ${typeof sheetRows !== 'undefined' ? sheetRows.length : 0}, Pin count: ${pins.length}`,
     `Geo-reminder: ${typeof geoTasks !== 'undefined' ? geoTasks.length : 0} ta`,
   ].join('\n');
 }
