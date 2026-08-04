@@ -1,5 +1,6 @@
 # local-only Claude Code settings
 .claude/settings.local.json
+.claude/*.tmp.*
 
 # deps / build (ei project e build step nei, tobu bhul kore jate na dhoke)
 node_modules/
