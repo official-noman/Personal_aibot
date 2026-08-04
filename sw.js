@@ -1,5 +1,5 @@
 /* Persona service worker — offline caching + notification clicks */
-const CACHE = 'persona-v6';
+const CACHE = 'persona-v7';
 const ASSETS = [
   './',
   './index.html',
@@ -7,6 +7,7 @@ const ASSETS = [
   './app.js',
   './alarm.js',
   './chat.js',
+  './geo.js',
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png',

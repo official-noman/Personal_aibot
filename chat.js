@@ -360,8 +360,9 @@ const ACTIONS = {
   backup_export() { $('#exportBtn').click(); return { text: '⬇️ Backup file download hocche.' }; },
 
   navigate({ view }) {
-    const v = { home: 'home', tasks: 'tasks', sleep: 'sleep', checklist: 'checklist', checkin: 'checkin', notes: 'notes', pins: 'pins' }[view];
+    const v = { home: 'home', tasks: 'tasks', sleep: 'sleep', checklist: 'checklist', checkin: 'checkin', notes: 'notes', pins: 'pins', geo: 'geo' }[view];
     if (!v) return { text: 'Kon page e jabo bujhi nai.' };
+    if (v === 'geo' && typeof openGeoView === 'function') { closeChat(); openGeoView(); return { text: 'Radar page e niye gelam.', silent: true }; }
     closeChat(); navTo(v);
     return { text: `${TITLES[v]} e niye gelam.`, silent: true };
   },
@@ -401,8 +402,8 @@ const ACTIONS = {
 
   help() {
     return {
-      text: `Ami ja ja korte pari — just likhe dao:\n• **Kaj**: "kal bikel 5 tay bazar korte hobe", "bazar ta done", "ki ki kaj baki"\n• **Ghum**: "ghumate jachhi", "uthe gechi", "kal 7 ghonta ghumiyechi"\n• **Checklist**: "namaz porechi", "checklist e boi pora add koro"\n• **Note**: "likhe rakho — ammar oshudh kena lagbe"\n• **Pin**: "pin koro uthar dua ..."\n• **Check-in**: "mood bhalo aaj", "aaj kemon gelo"`,
-      chips: ['Ki ki kaj baki', 'Aaj kemon gelo', 'Ghumate jachhi'],
+      text: `Ami ja ja korte pari — just likhe dao:\n• **Kaj**: "kal bikel 5 tay bazar korte hobe", "bazar ta done", "ki ki kaj baki"\n• **Ghum**: "ghumate jachhi", "uthe gechi", "kal 7 ghonta ghumiyechi"\n• **Checklist**: "namaz porechi", "checklist e boi pora add koro"\n• **Note**: "likhe rakho — ammar oshudh kena lagbe"\n• **Pin**: "pin koro uthar dua ..."\n• **Check-in**: "mood bhalo aaj", "aaj kemon gelo"\n• **📍 Geo**: "Dhanmondi gele boi kinte mone koriyo", "radar dekhao"`,
+      chips: ['Ki ki kaj baki', 'Aaj kemon gelo', 'Ghumate jachhi', 'Radar dekhao'],
     };
   },
 };
@@ -501,6 +502,11 @@ const KW = {
   backup: ['backup', 'export', 'data save koro'],
   help: ['help', 'ki korte paro', 'ki paro', 'sahajjo', 'kivabe', 'সাহায্য'],
   no: ['na', 'lagbe na', 'lagbena', 'thak', 'thak lagbe na', 'no', 'cancel', 'বাদ'],
+  geoAdd: ['gele mone', 'gele amake', 'gele remind', 'gele reminder', 'gele bolo', 'jaygay gele', 'kachhe gele', 'reach korle', 'pouchle', 'pounchle', 'pouche gele', 'gele korte', 'গেলে মনে', 'geo reminder', 'geo add', 'location reminder'],
+  geoList: ['geo list', 'geo dekhao', 'geo koto', 'radar dekhao', 'radar list', 'kon kon jaygay', 'jaygay reminder gulo'],
+  geoDel: ['geo delete', 'geo muche', 'geo bad', 'geo remove', 'radar muche', 'radar baad'],
+  geoOn: ['location on', 'location chalu', 'geo on', 'geo chalu', 'tracking on', 'tracking chalu', 'radar on'],
+  geoOff: ['location off', 'location bondho', 'geo off', 'geo bondho', 'tracking off', 'tracking bondho', 'radar off'],
 };
 const MOOD_WORDS = [
   { k: ['khub kharap', 'জঘন্য', 'terrible', 'awful'], v: 0 },
@@ -639,8 +645,32 @@ function parseIntent(raw) {
     return { action: 'checkin_save', args: { mood: mood.v, text: raw }, sure: true };
   }
   /* navigation */
-  const navHit = { home: ['home e', 'aaj dekhao'], tasks: ['kaj er page', 'task page'], sleep: ['ghum page', 'ghum dekhao'], checklist: ['checklist page'], notes: ['note dekhao', 'notes dekhao'], pins: ['pin dekhao'], checkin: ['check in dekhao', 'checkin dekhao'] };
+  const navHit = { home: ['home e', 'aaj dekhao'], tasks: ['kaj er page', 'task page'], sleep: ['ghum page', 'ghum dekhao'], checklist: ['checklist page'], notes: ['note dekhao', 'notes dekhao'], pins: ['pin dekhao'], checkin: ['check in dekhao', 'checkin dekhao'], geo: ['radar page', 'radar dekhao', 'geo page', 'geo dekhao', 'location page'] };
   for (const [v, keys] of Object.entries(navHit)) if (hasAny(t, keys)) return { action: 'navigate', args: { view: v }, sure: true };
+
+  /* ---- geo / location reminder ---- */
+  if (hasAny(t, KW.geoOn)) return { action: 'geo_enable', args: {}, sure: true };
+  if (hasAny(t, KW.geoOff)) return { action: 'geo_disable', args: {}, sure: true };
+  if (hasAny(t, KW.geoList)) return { action: 'geo_list', args: {}, sure: true };
+  if (hasAny(t, KW.geoDel)) {
+    const q = cleanTitle(raw, KW.geoDel);
+    return { action: 'geo_delete', args: { query: q }, sure: true };
+  }
+  if (hasAny(t, KW.geoAdd)) {
+    /* "Dhanmondi gele amake boi kinar kotha mone koriye dio" */
+    const parts = t.split(/\s*gele\s*/i);
+    let place = '', label = '';
+    if (parts.length >= 2) {
+      place = parts[0].replace(/^(ami |amake |amar |)/, '').trim();
+      label = parts.slice(1).join(' ')
+        .replace(/\b(amake|amar|mone koriye dio|mone koriye dao|mone koriyo|remind koro|reminder|remind me|bolo|bolbe)\b/g, ' ')
+        .replace(/\s+/g, ' ').trim();
+    }
+    if (!label && !place) {
+      label = cleanTitle(raw, KW.geoAdd);
+    }
+    return { action: 'geo_add', args: { label: label ? label[0].toUpperCase() + label.slice(1) : '', place }, sure: true };
+  }
 
   if (wantsAdd) {
     const w = parseWhen(raw);
@@ -711,7 +741,8 @@ checklist_toggle{query:string}  checklist_add{label:string, emoji?:string}  chec
 note_add{text:string}   note_search{query:string}
 pin_add{text:string, cat?:"dua"|"rule"|"reminder", title?:string, wake?:boolean}
 checkin_save{mood:0..4, text?:string}
-stats_today{}  backup_export{}  navigate{view:"home"|"tasks"|"sleep"|"checklist"|"checkin"|"notes"|"pins"}  help{}`;
+stats_today{}  backup_export{}  navigate{view:"home"|"tasks"|"sleep"|"checklist"|"checkin"|"notes"|"pins"|"geo"}  help{}
+geo_add{label:string, place:string, radius?:number}  geo_list{}  geo_delete{query:string}  geo_enable{}  geo_disable{}`;
 
 function stateSummary() {
   const open = tasks.filter(t => !t.done).slice(0, 20).map(t => `- ${t.title}${t.due ? ' (due ' + t.due + ')' : ''}`);
@@ -723,6 +754,7 @@ function stateSummary() {
     `Ghum cholche: ${activeSleep ? 'ha, shuru ' + activeSleep.start : 'na'}`,
     `Shesh ghum: ${[...sleeps].sort((a, b) => b.date.localeCompare(a.date))[0]?.hours ?? '-'} h`,
     `Note count: ${notes.length}, Pin count: ${pins.length}`,
+    `Geo-reminder: ${typeof geoTasks !== 'undefined' ? geoTasks.length : 0} ta`,
   ].join('\n');
 }
 

@@ -195,6 +195,56 @@
         </form>
         <div id="pinList" class="list"></div>
       </section>
+
+      <!-- ============ GEO / RADARS ============ -->
+      <section class="view hidden" data-view="geo">
+        <!-- onboarding -->
+        <div class="input-card geo-onboard">
+          <div class="geo-onboard-ico">📍</div>
+          <b>Jaygay-bhittik Reminder</b>
+          <p>Kono jaygay gele automatic mone koriye dibo — jemon "Dhanmondi gele boi kinte hobe".</p>
+          <label class="switch-row" style="margin-top:10px">
+            <span>Location tracking chalu koro</span>
+            <input type="checkbox" id="geoToggle" />
+          </label>
+          <div id="geoPermStatus" class="alarm-support" style="margin-top:8px"></div>
+        </div>
+
+        <!-- map -->
+        <div id="geoMapWrap" class="geo-map-wrap"></div>
+        <div style="display:flex;gap:8px;margin-bottom:12px">
+          <button class="btn btn-soft" id="geoLocateBtn" type="button" style="flex:1">📍 Ami kothay</button>
+          <button class="btn btn-soft" id="geoHereBtn" type="button" style="flex:1">📌 Ekhane reminder</button>
+        </div>
+
+        <!-- search -->
+        <div class="input-card">
+          <div class="field-label">Jaygay khojo (naam likho)</div>
+          <div class="input-row">
+            <input type="text" id="geoSearchInput" placeholder="jemon: Dhanmondi, Mirpur 10, Uttara" autocomplete="off" />
+            <button class="btn btn-primary" id="geoSearchBtn" type="button">Khojo</button>
+          </div>
+          <div id="geoSearchResults"></div>
+        </div>
+
+        <!-- add form -->
+        <form id="geoAddForm" class="input-card">
+          <div class="field-label">Notun geo-reminder</div>
+          <input type="text" id="geoAddLabel" placeholder="Ki mone koriye dibo? jemon: Boi kinte hobe" autocomplete="off" required />
+          <input type="text" id="geoAddPlace" placeholder="Jaygay (map e tap koro ba search koro)" readonly />
+          <input type="hidden" id="geoAddLat" />
+          <input type="hidden" id="geoAddLon" />
+          <div class="input-row" style="margin-top:6px">
+            <div class="field-label" style="flex:1">Radius: <span id="geoRadVal">200m</span></div>
+            <input type="number" id="geoRadius" min="50" max="2000" step="50" class="mini-num" />
+          </div>
+          <button type="submit" class="btn btn-primary btn-block" style="margin-top:8px">📍 Add Geo-reminder</button>
+        </form>
+
+        <!-- active list -->
+        <div class="section-head"><h3>Active Radars</h3></div>
+        <div id="geoList" class="list"></div>
+      </section>
     </main>
 
     <nav class="bottomnav">
@@ -216,6 +266,7 @@
       <button class="sheet-item" data-goto="notes"><span>💡</span><div><b>Notes</b><small>Likhe rakho, khoje ber koro</small></div></button>
       <button class="sheet-item" data-goto="pins"><span>🤲</span><div><b>Uthe ja dekhbo</b><small>Dua, niyom, reminder pin koro</small></div></button>
       <button class="sheet-item" id="openChatBtn"><span>✨</span><div><b>Persona AI</b><small>Chat e bolo, ami kore dibo</small></div></button>
+      <button class="sheet-item" id="geoNavBtn"><span>📍</span><div><b>Radars</b><small>Jaygay gele reminder — geo-fencing</small></div></button>
       <button class="sheet-item" id="alarmSettingsBtn"><span>⏰</span><div><b>Alarm &amp; ringtone</b><small>Awaj, vibration, snooze — test koro</small></div></button>
       <button class="sheet-item" id="exportBtn"><span>⬇️</span><div><b>Backup neya</b><small>Sob data file e save koro</small></div></button>
       <button class="sheet-item" id="importBtn"><span>⬆️</span><div><b>Backup fera</b><small>File theke data restore koro</small></div></button>
@@ -342,5 +393,6 @@
   <script src="app.js"></script>
   <script src="alarm.js"></script>
   <script src="chat.js"></script>
+  <script src="geo.js"></script>
 </body>
 </html>

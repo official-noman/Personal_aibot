@@ -441,3 +441,24 @@ input[type="number"] { max-width: 150px; }
 .alarm-time { font-size: 15px; color: var(--haze); margin-bottom: 34px; }
 .alarm-btn { max-width: 340px; margin-top: 10px; }
 a.chat-chip { display: inline-flex; align-items: center; text-decoration: none; }
+
+/* ============================================================
+   GEO / RADARS — geofencing UI
+   ============================================================ */
+.geo-onboard { text-align: center; }
+.geo-onboard-ico { font-size: 42px; margin-bottom: 8px; }
+.geo-onboard b { display: block; font-family: var(--display); font-size: 18px; margin-bottom: 6px; }
+.geo-onboard p { font-size: 14px; line-height: 1.7; color: var(--haze); margin-bottom: 0; }
+
+.geo-map-wrap { border-radius: var(--radius-sm); overflow: hidden; margin-bottom: 14px; min-height: 80px;
+  border: 1px solid var(--line); }
+/* Leaflet tiles inside dark theme */
+.geo-map-wrap .leaflet-container { background: var(--dusk); }
+.geo-map-wrap .leaflet-popup-content-wrapper { background: var(--dusk); color: var(--star); border: 1px solid var(--line-2);
+  border-radius: var(--radius-sm); box-shadow: 0 8px 24px rgba(0,0,0,.5); }
+.geo-map-wrap .leaflet-popup-tip { background: var(--dusk); }
+.geo-map-wrap .leaflet-popup-close-button { color: var(--haze); }
+.geo-map-wrap .leaflet-control-zoom a { background: var(--dusk-2); color: var(--star); border-color: var(--line); }
+.geo-map-wrap .leaflet-control-attribution { background: rgba(7,10,20,.7); color: var(--faint); font-size: 10px; }
+
+.geo-search-item small { display: block; color: var(--haze); font-size: 12px; margin-top: 2px; line-height: 1.4; }
