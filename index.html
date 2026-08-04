@@ -24,6 +24,10 @@
 
   <div id="app">
     <header class="topbar">
+      <div class="topbar-actions">
+        <button id="backBtn" class="nav-icon-btn" title="Back" aria-label="Back">‹</button>
+        <button id="homeBtn" class="nav-icon-btn" title="Home" aria-label="Home">⌂</button>
+      </div>
       <div class="topbar-title">
         <span class="eyebrow" id="viewEyebrow">Persona</span>
         <h1 id="viewTitle">Aaj</h1>
@@ -183,7 +187,7 @@
           <textarea id="sheetNote" rows="3" placeholder="Details / note…" ></textarea>
           <div class="input-row">
             <input type="text" id="sheetCat" placeholder="Category (optional)" autocomplete="off" />
-            <button type="submit" class="btn btn-primary">Save</button>
+            <button type="submit" id="sheetSaveBtn" class="btn btn-primary">Save</button>
           </div>
         </form>
         <div class="sheet-tools">

@@ -334,12 +334,14 @@ async function renderGeoPage() {
 async function openGeoView() {
   /* navigate to geo view */
   closeSheet();
+  if (typeof viewStack !== 'undefined' && currentView !== 'geo') viewStack.push(currentView);
   $$('.view').forEach(v => v.classList.toggle('hidden', v.dataset.view !== 'geo'));
   $$('.nav-btn').forEach(b => b.classList.toggle('active', false));
   $$('.nav-btn[data-nav="more"]').forEach(b => b.classList.add('active'));
   $('#viewTitle').textContent = 'Radars';
   $('#viewEyebrow').textContent = '📍 Geo-reminders';
   currentView = 'geo';
+  if (typeof updateTopActions === 'function') updateTopActions();
 
   /* try to get current location */
   try {

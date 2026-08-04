@@ -71,23 +71,37 @@ function humanDur(hrs) {
 const TITLES = { home: 'Aaj', tasks: 'Kaj', sleep: 'Ghum', checklist: 'Checklist', checkin: 'Check-in', notes: 'Notes', sheet: 'Sheet', helpdesk: 'AI Help Desk', pins: 'Uthe ja dekhbo' };
 const EYEBROWS = { home: 'Persona', tasks: 'Ki korte hobe', sleep: 'Bishram', checklist: 'Aajker obhyash', checkin: 'Nijer shathe', notes: 'Mone rakho', sheet: 'Date-time log', helpdesk: 'Guide & commands', pins: 'Ghum theke uthe' };
 let currentView = 'home';
+let viewStack = [];
 
-function navTo(view) {
+function navTo(view, opts = {}) {
   if (view === 'more') { openSheet(); return; }
   closeSheet();
+  if (!opts.replace && view !== currentView) viewStack.push(currentView);
   currentView = view;
   $$('.view').forEach(v => v.classList.toggle('hidden', v.dataset.view !== view));
   $$('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.nav === view));
   $('#viewTitle').textContent = TITLES[view] || 'Persona';
   $('#viewEyebrow').textContent = EYEBROWS[view] || 'Persona';
   $('#main').scrollTop = 0;
+  updateTopActions();
   render(view);
+}
+function goBack() {
+  const prev = viewStack.pop();
+  if (prev) navTo(prev, { replace: true });
+  else navTo('home', { replace: true });
+}
+function updateTopActions() {
+  $('#backBtn').disabled = currentView === 'home' && !viewStack.length;
+  $('#homeBtn').disabled = currentView === 'home';
 }
 function render(view) {
   ({ home: renderHome, tasks: renderTasks, sleep: renderSleep, checklist: renderChecklist,
      checkin: renderCheckin, notes: renderNotes, sheet: renderSheet, helpdesk: renderHelpDesk, pins: renderPins }[view] || (() => {}))();
 }
 $$('.nav-btn').forEach(b => b.onclick = () => navTo(b.dataset.nav));
+$('#backBtn').onclick = goBack;
+$('#homeBtn').onclick = () => { viewStack = []; navTo('home', { replace: true }); };
 document.addEventListener('click', e => {
   const g = e.target.closest('[data-goto]');
   if (g) navTo(g.dataset.goto);
@@ -522,6 +536,7 @@ $('#noteSearch').addEventListener('input', e => { noteQuery = e.target.value; re
    SHEET / DATE-TIME LOG
    ============================================================ */
 let sheetQuery = '';
+let sheetEditId = null;
 function addSheetRow({ when, title, note, cat }) {
   const iso = when ? new Date(when).toISOString() : new Date().toISOString();
   sheetRows.push({ id: uid(), when: iso, title: (title || '').trim(), note: (note || '').trim(), cat: (cat || 'General').trim(), ts: Date.now() });
@@ -543,21 +558,54 @@ function renderSheet() {
         ${r.note ? `<div class="sheet-note">${esc(r.note)}</div>` : ''}
       </div>
       <div class="sheet-cat">${esc(r.cat || 'General')}</div>
-      <button class="del" data-act="del">🗑</button>
+      <div class="sheet-row-actions">
+        <button class="mini-action" data-act="edit" title="Edit">✎</button>
+        <button class="del" data-act="del">🗑</button>
+      </div>
     </div>`).join('') : `<div class="empty">${sheetQuery ? 'Kichu pawa gelo na.' : 'Ekhono kono sheet row nei.'}</div>`;
-  $$('#sheetList .sheet-row').forEach(el => el.querySelector('[data-act="del"]').onclick = () => {
-    sheetRows = sheetRows.filter(x => x.id !== el.dataset.id);
-    save.sheetRows(); renderSheet(); toast('Row muche gelo');
+  $$('#sheetList .sheet-row').forEach(el => {
+    const id = el.dataset.id;
+    el.querySelector('[data-act="edit"]').onclick = () => editSheetRow(id);
+    el.querySelector('[data-act="del"]').onclick = () => {
+      sheetRows = sheetRows.filter(x => x.id !== id);
+      save.sheetRows(); renderSheet(); toast('Row muche gelo');
+    };
   });
+}
+function editSheetRow(id) {
+  const row = sheetRows.find(x => x.id === id);
+  if (!row) return;
+  sheetEditId = id;
+  $('#sheetTime').value = row.when ? row.when.slice(0, 16) : '';
+  $('#sheetTitle').value = row.title || '';
+  $('#sheetNote').value = row.note || '';
+  $('#sheetCat').value = row.cat || '';
+  $('#sheetSaveBtn').textContent = 'Update';
+  $('#sheetForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 $('#sheetForm').onsubmit = e => {
   e.preventDefault();
   const title = $('#sheetTitle').value.trim();
   const note = $('#sheetNote').value.trim();
   if (!title && !note) return;
-  addSheetRow({ when: $('#sheetTime').value || new Date(), title, note, cat: $('#sheetCat').value || 'General' });
+  if (sheetEditId) {
+    const row = sheetRows.find(x => x.id === sheetEditId);
+    if (row) {
+      row.when = new Date($('#sheetTime').value || row.when || new Date()).toISOString();
+      row.title = title;
+      row.note = note;
+      row.cat = ($('#sheetCat').value || 'General').trim();
+      row.ts = Date.now();
+      save.sheetRows();
+      toast('Sheet row update holo');
+    }
+    sheetEditId = null;
+    $('#sheetSaveBtn').textContent = 'Save';
+  } else {
+    addSheetRow({ when: $('#sheetTime').value || new Date(), title, note, cat: $('#sheetCat').value || 'General' });
+    toast('Sheet row save holo');
+  }
   e.target.reset();
-  toast('Sheet row save holo');
   renderSheet();
 };
 $('#sheetSearch').addEventListener('input', e => { sheetQuery = e.target.value; renderSheet(); });
