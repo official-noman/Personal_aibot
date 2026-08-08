@@ -7,7 +7,15 @@
 /* ---------- storage ---------- */
 const DB = {
   get(k, f) { try { const v = localStorage.getItem('shathi.' + k); return v ? JSON.parse(v) : f; } catch (e) { return f; } },
-  set(k, v) { localStorage.setItem('shathi.' + k, JSON.stringify(v)); },
+  /* quota bhorle localStorage throw kore — silent na rekhe user ke janai */
+  set(k, v) {
+    try { localStorage.setItem('shathi.' + k, JSON.stringify(v)); return true; }
+    catch (e) {
+      console.error('[persona] storage e lekha gelo na', k, e);
+      if (typeof toast === 'function') toast('Phone er storage bhore geche — purono data muche dekho');
+      return false;
+    }
+  },
 };
 
 let tasks       = DB.get('tasks', []);
@@ -578,7 +586,7 @@ function renderSheet() {
     <div class="sheet-row" data-id="${r.id}">
       <div class="sheet-date">${esc(new Date(r.when).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: '2-digit', hour: 'numeric', minute: '2-digit', hour12: true }))}</div>
       <div class="sheet-main">
-        <div class="sheet-title">${esc(r.title || 'Untitled')}</div>
+        <div class="sheet-row-title">${esc(r.title || 'Untitled')}</div>
         ${r.note ? `<div class="sheet-note">${esc(r.note)}</div>` : ''}
       </div>
       <div class="sheet-cat">${esc(r.cat || 'General')}</div>

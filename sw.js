@@ -1,5 +1,5 @@
 /* Persona service worker — offline caching + notification clicks */
-const CACHE = 'persona-v16';
+const CACHE = 'persona-v19';
 const ASSETS = [
   './',
   './index.html',
@@ -30,6 +30,9 @@ self.addEventListener('activate', (e) => {
 /* Cache-first for app shell; network fallback for everything else. */
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
+  /* /api/* (Gemini proxy) kokhono cache ba shell-fallback kora jabe na —
+     na hole net gele API error er bodole HTML shell ferot ashto. */
+  if (new URL(e.request.url).pathname.startsWith('/api/')) return;
   e.respondWith(
     caches.match(e.request).then((cached) =>
       cached ||

@@ -10,10 +10,165 @@
 'use strict';
 
 /* ---------- storage ---------- */
+/* config.local.js (gitignored) thakle sekhankar key ta default — kichu na kore-i AI mode chole */
+const LOCAL_CFG = (typeof window !== 'undefined' && window.PERSONA_CONFIG) || {};
+const DEFAULT_KEY = LOCAL_CFG.key || '';
+const DEFAULT_MODEL = LOCAL_CFG.model || 'gemini-3.6-flash';
+const AI_DEFAULTS = { on: !!DEFAULT_KEY, key: DEFAULT_KEY, pass: '', model: DEFAULT_MODEL, len: 'mid' };
+
 let chatLog = DB.get('chat', []);
-let aiCfg = DB.get('ai', { on: false, key: '', model: 'gemini-2.5-flash' });
+let aiCfg = Object.assign({}, AI_DEFAULTS, DB.get('ai', {}));
+/* purono hardcoded default theke migrate — user nijer icchay onno model dile ta thakbe */
+if (aiCfg.model === 'gemini-2.5-flash') aiCfg.model = DEFAULT_MODEL;
+/* age theke chalano install e key faka chhilo — default key ta bosiye di */
+if (!aiCfg.key && DEFAULT_KEY) { aiCfg.key = DEFAULT_KEY; aiCfg.on = true; }
+
+const usingDefaultKey = () => !!DEFAULT_KEY && aiCfg.key === DEFAULT_KEY;
+
+/* ---------- Gemini kothay call hobe ----------
+   Duita rasta:
+   1) Nijer key hate thakle (local dev / config.local.js) — sorasori Google e.
+   2) Key na thakle — nijer domain er `/api/gemini` proxy (Cloudflare Pages
+      Function), jekhane key ta server side secret. Browser e key jay na, tai
+      public URL theke keu key churi korte pare na. Gate: passphrase header.
+   Erfole ek-i app office/basha/phone sob jaygay chole — protita device e
+   shudhu ekbar passphrase dite hoy. */
+const PROXY_BASE = '/api/gemini';
+const usingProxy = () => !aiCfg.key && !!aiCfg.pass;
+const aiConfigured = () => !!(aiCfg.key || aiCfg.pass);
+
+function apiTarget(path, params = {}) {
+  const q = new URLSearchParams(params);
+  if (aiCfg.key) {
+    q.set('key', aiCfg.key);
+    return { url: `https://generativelanguage.googleapis.com/v1beta/${path}?${q}`, headers: {} };
+  }
+  return { url: `${PROXY_BASE}/${path}?${q}`, headers: { 'x-persona-pass': aiCfg.pass || '' } };
+}
+
+let aiModels = DB.get('aiModels', []);      // API theke fetch kora model ID list
+let aiUsage  = DB.get('aiUsage', {});       // { 'YYYY-MM-DD': { req, in, out } }
+
 const saveChat = () => DB.set('chat', chatLog.slice(-120));
 const saveAi = () => DB.set('ai', aiCfg);
+
+/* ============================================================
+   CHOBI STORE — IndexedDB
+   base64 chobi localStorage e rakhle quota (~5MB) sathe sathe shesh hoye jay,
+   tai chobi ekhane thake ar chatLog e shudhu id.
+   ============================================================ */
+const IMG = {
+  _db: null,
+  open() {
+    if (this._db) return this._db;
+    this._db = new Promise((res, rej) => {
+      const req = indexedDB.open('PersonaImgDB', 1);
+      req.onupgradeneeded = () => {
+        const d = req.result;
+        if (!d.objectStoreNames.contains('imgs')) d.createObjectStore('imgs', { keyPath: 'id' });
+      };
+      req.onsuccess = () => res(req.result);
+      req.onerror = () => rej(req.error || new Error('IndexedDB khola gelo na'));
+    });
+    return this._db;
+  },
+  async put(rec) {
+    const db = await this.open();
+    return new Promise((res, rej) => {
+      const tx = db.transaction('imgs', 'readwrite');
+      tx.objectStore('imgs').put(rec);
+      tx.oncomplete = () => res(rec.id);
+      tx.onerror = () => rej(tx.error || new Error('Chobi save hoy ni'));
+    });
+  },
+  async get(id) {
+    const db = await this.open();
+    return new Promise((res, rej) => {
+      const r = db.transaction('imgs', 'readonly').objectStore('imgs').get(id);
+      r.onsuccess = () => res(r.result || null);
+      r.onerror = () => rej(r.error || new Error('Chobi pora gelo na'));
+    });
+  },
+  async keys() {
+    const db = await this.open();
+    return new Promise((res, rej) => {
+      const r = db.transaction('imgs', 'readonly').objectStore('imgs').getAllKeys();
+      r.onsuccess = () => res(r.result || []);
+      r.onerror = () => rej(r.error || new Error('Chobi list pawa gelo na'));
+    });
+  },
+  async del(ids) {
+    if (!ids.length) return;
+    const db = await this.open();
+    return new Promise((res, rej) => {
+      const tx = db.transaction('imgs', 'readwrite');
+      const st = tx.objectStore('imgs');
+      ids.forEach(id => st.delete(id));
+      tx.oncomplete = () => res();
+      tx.onerror = () => rej(tx.error || new Error('Chobi mucha gelo na'));
+    });
+  },
+  /* chatLog trim hole je chobi gulo ar kono message e nei, segulo mucha */
+  async gc() {
+    try {
+      const keep = new Set();
+      chatLog.forEach(m => (m.imgs || []).forEach(id => keep.add(id)));
+      pendingImgs.forEach(im => keep.add(im.id));
+      const orphan = (await this.keys()).filter(id => !keep.has(id));
+      if (orphan.length) {
+        await this.del(orphan);
+        orphan.forEach(id => imgCache.delete(id));
+      }
+    } catch (e) { console.warn('[persona-ai] chobi gc fail', e); }
+  },
+};
+
+/* ---------- chobi prep (resize + compress) ---------- */
+const IMG_MAX = 1152;        // Gemini tile size er sathe mane jay, quality-o thake
+const IMG_THUMB = 240;
+const MAX_ATTACH = 4;        // ek message e sorbochcho koyta chobi
+const MAX_CTX_IMGS = 4;      // ek request e (history soho) sorbochcho koyta chobi
+
+const imgCache = new Map();  // id -> { thumb, full }
+let pendingImgs = [];        // pathanor age composer e attach kora chobi
+
+const b64 = (dataUrl) => dataUrl.slice(dataUrl.indexOf(',') + 1);
+
+function fileToImage(file) {
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file);
+    const im = new Image();
+    im.onload = () => { URL.revokeObjectURL(url); res(im); };
+    im.onerror = () => { URL.revokeObjectURL(url); rej(new Error(`"${file.name}" chobi hishebe pora gelo na`)); };
+    im.src = url;
+  });
+}
+
+function scaleToJpeg(im, max, quality) {
+  const scale = Math.min(1, max / Math.max(im.width, im.height));
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(im.width * scale));
+  c.height = Math.max(1, Math.round(im.height * scale));
+  const ctx = c.getContext('2d');
+  /* JPEG e alpha nei — sada na bhorle transparent PNG/screenshot kalo hoye jay */
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, c.width, c.height);
+  ctx.drawImage(im, 0, 0, c.width, c.height);
+  return c.toDataURL('image/jpeg', quality);
+}
+
+/** File → { id, full, thumb } — resize kore na pathale token ar quota dutoi pure jay. */
+async function prepImage(file) {
+  if (!/^image\//.test(file.type || '')) throw new Error(`"${file.name}" chobi na`);
+  if (file.size > 25 * 1024 * 1024) throw new Error(`"${file.name}" onek boro (25MB+)`);
+  const im = await fileToImage(file);
+  return {
+    id: 'img_' + uid(),
+    full: scaleToJpeg(im, IMG_MAX, 0.72),
+    thumb: scaleToJpeg(im, IMG_THUMB, 0.7),
+    ts: Date.now(),
+  };
+}
 
 /* ============================================================
    TEXT NORMALIZATION
@@ -792,34 +947,256 @@ function stateSummary() {
   ].join('\n');
 }
 
-async function askLLM(userText, memCtx = '') {
-  const sys = `Tumi "Persona" — ekta personal companion app er assistant. User Banglish/Bangla/English mishiye kotha bole. Tumi-o Banglish e chhoto, uposhom kore uttor dao (max 3 line).
+/* ---------- uttor er size ---------- */
+const LEN_OPTS = {
+  short: { label: 'Chhoto',    tokens: 500,  hint: '1–2 line — quick jobab',        style: 'Uttor khub chhoto rakho — sorbochcho 2 line.' },
+  mid:   { label: 'Majhari',   tokens: 1200, hint: '3–5 line — default',            style: 'Uttor chhoto rakho — sorbochcho 5 line.' },
+  long:  { label: 'Boro',      tokens: 2600, hint: '1–2 paragraph — byakkha soho',  style: 'Ek theke dui paragraph porjonto uttor dite paro.' },
+  full:  { label: 'Bistarito', tokens: 6000, hint: 'Full — heading, step, list',    style: 'Bistarito uttor dao — dorkar hole heading, bullet ar step-by-step byakkha use koro.' },
+};
+const lenCfg = () => LEN_OPTS[aiCfg.len] || LEN_OPTS.mid;
+
+/* ---------- model list ---------- */
+const FALLBACK_MODELS = [
+  'gemini-3.6-flash', 'gemini-3.6-pro',
+  'gemini-flash-latest', 'gemini-pro-latest',
+  'gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.5-pro',
+];
+
+/** Tomar nijer key diye Google er kachhe jiggesh kore asol model list ene rakhe. */
+async function fetchModels() {
+  if (!aiConfigured()) throw new Error('Age API key ba passphrase dao, tarpor model list ana jabe');
+  const t = apiTarget('models', { pageSize: 200 });
+  const res = await fetch(t.url, { headers: t.headers });
+  if (!res.ok) throw await apiError(res);
+  const data = await res.json();
+  const list = (data.models || [])
+    .filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
+    .map(m => String(m.name || '').replace(/^models\//, ''))
+    .filter(n => n.startsWith('gemini'))
+    .sort();
+  if (!list.length) throw new Error('Ei key te generateContent kore emon kono model nei');
+  aiModels = list;
+  DB.set('aiModels', aiModels);
+  return list;
+}
+
+/* ---------- error → manush-pora bhasha ---------- */
+const ERR_MAP = {
+  400: 'Request ta API nilo na — API key ba model ID thik nei.',
+  401: 'API key ta invalid. aistudio.google.com theke notun key nao.',
+  403: 'Ei key te permission nei — key ta enable ache kina dekho.',
+  404: 'Ei model ta tomar key te nei. Settings e "Refresh" diye asol list theke beche nao.',
+  429: 'Quota/rate limit shesh. Ektu por abar try koro.',
+  500: 'Google er server e somossa hoyeche. Abar try koro.',
+  503: 'Model ta ekhon overloaded. Ektu por abar try koro.',
+};
+
+async function apiError(res) {
+  let detail = '';
+  try { detail = (await res.json())?.error?.message || ''; }
+  catch (_) { detail = await res.text().catch(() => ''); }
+  /* proxy mode e 401 mane key na, passphrase bhul */
+  const base = (usingProxy() && res.status === 401)
+    ? 'Passphrase ta thik nei — settings er "Cloud access" e thik ta dao.'
+    : (ERR_MAP[res.status] || `API error ${res.status}.`);
+  const e = new Error(detail ? `${base} (${String(detail).slice(0, 120)})` : base);
+  e.status = res.status;
+  return e;
+}
+
+/* ---------- usage tracking ---------- */
+function trackUsage(um) {
+  if (!um) return;
+  const k = dayKey();
+  const d = aiUsage[k] || (aiUsage[k] = { req: 0, in: 0, out: 0 });
+  d.req += 1;
+  d.in += um.promptTokenCount || 0;
+  d.out += (um.candidatesTokenCount || 0) + (um.thoughtsTokenCount || 0);
+  const days = Object.keys(aiUsage).sort();
+  while (days.length > 30) delete aiUsage[days.shift()];
+  DB.set('aiUsage', aiUsage);
+  renderUsage();
+}
+
+/**
+ * Adhek-asha JSON theke ekta string field er joto tuku eseche toto tuku ber kore.
+ * Streaming e `{"reply":"Hoye ge` porjonto ashle-o user ke live text dekhate pari.
+ */
+function partialJsonString(buf, key) {
+  const kk = `"${key}"`;
+  const ki = buf.indexOf(kk);
+  if (ki < 0) return '';
+  const ci = buf.indexOf(':', ki + kk.length);
+  if (ci < 0) return '';
+  let i = ci + 1;
+  while (i < buf.length && /\s/.test(buf[i])) i++;
+  if (buf[i] !== '"') return '';
+  i++;
+  let out = '';
+  while (i < buf.length) {
+    const ch = buf[i];
+    if (ch === '\\') {
+      const n = buf[i + 1];
+      if (n === undefined) break;                      // escape adhek eseche, porer chunk e ashbe
+      if (n === 'u') {
+        if (i + 6 > buf.length) break;
+        out += String.fromCharCode(parseInt(buf.slice(i + 2, i + 6), 16));
+        i += 6; continue;
+      }
+      out += ({ n: '\n', t: '\t', r: '\r', b: '\b', f: '\f' }[n] ?? n);
+      i += 2; continue;
+    }
+    if (ch === '"') break;
+    out += ch; i++;
+  }
+  return out;
+}
+
+/**
+ * History + ekhonkar chobi diye Gemini `contents` banay.
+ * Chobi bhari, tai sob mile MAX_CTX_IMGS tar beshi kokhono pathai na.
+ */
+async function buildContents(userText, images) {
+  const cur = (images || []).slice(0, MAX_ATTACH);
+  let budget = Math.max(0, MAX_CTX_IMGS - cur.length);
+
+  const hist = chatLog.slice(-10).filter(m => !m.warn && !m.streaming && (m.text || (m.imgs || []).length));
+  /* natun theke purono dike ghure budget bilai — sob theke relevant chobi gulo tikbe */
+  const allow = new Set();
+  for (let i = hist.length - 1; i >= 0 && budget > 0; i--) {
+    if (hist[i].role !== 'u') continue;
+    for (const id of (hist[i].imgs || [])) {
+      if (budget <= 0) break;
+      allow.add(id); budget--;
+    }
+  }
+
+  const out = [];
+  for (const m of hist) {
+    const role = m.role === 'u' ? 'user' : 'model';
+    const parts = [];
+    if (role === 'user') {
+      for (const id of (m.imgs || [])) {
+        if (!allow.has(id)) continue;
+        const rec = imgCache.get(id) || await IMG.get(id).catch(() => null);
+        if (rec) parts.push({ inlineData: { mimeType: 'image/jpeg', data: b64(rec.full) } });
+      }
+    }
+    if (m.text) parts.push({ text: m.text });
+    if (!parts.length) continue;
+    /* Gemini pashapashi ek-i role pochondo kore na — merge kore di */
+    const last = out[out.length - 1];
+    if (last && last.role === role) last.parts.push(...parts);
+    else out.push({ role, parts });
+  }
+
+  const parts = cur.map(im => ({ inlineData: { mimeType: 'image/jpeg', data: b64(im.full) } }));
+  parts.push({ text: userText || 'Ei chobi ta dekho ar bujhiye dao.' });
+  const last = out[out.length - 1];
+  if (last && last.role === 'user') last.parts.push(...parts);
+  else out.push({ role: 'user', parts });
+  return out;
+}
+
+let aiAbort = null;   // cholte thaka request — Stop button ekhane abort kore
+
+/**
+ * Gemini ke jiggesh kore. SSE streaming, tai uttor word-by-word ashe.
+ * `onDelta(text)` protibar notun tuku niye dak pore.
+ */
+async function askLLM(userText, memCtx = '', images = [], onDelta = null) {
+  const L = lenCfg();
+  const sys = `Tumi "Persona" — ekta personal companion app er assistant. User Banglish/Bangla/English mishiye kotha bole. Tumi-o Banglish e uttor dao. ${L.style}
 Tomar kachhe ei tool gulo ache:${LLM_TOOLS}
 Jodi user er kono personal kotha/facts pash (jemon pet er nam, allergy, pochondo, favourite khabar), tahole save_memory tool call korbe.
 User er kotha bujhe joto gulo dorkar toto action banao. Kono action dorkar na hole actions faka rakho.
+User chobi pathale chobi ta dhore-i uttor dao — ki dekhcho ta bolo, ar dorkar hole sekhan theke task/note banao.
 App er ekhonkar obostha:
 ${stateSummary()}
 ${memCtx ? 'User er byapare tomar purano memory (Semantic Search results):\n' + memCtx : ''}
 Shudhu ei JSON format e uttor dao: {"reply":"...","actions":[{"name":"task_add","args":{"title":"..."}}],"chips":["..."]}`;
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(aiCfg.model)}:generateContent?key=${encodeURIComponent(aiCfg.key)}`;
+  const t = apiTarget(`models/${aiCfg.model}:streamGenerateContent`, { alt: 'sse' });
   const body = {
     systemInstruction: { parts: [{ text: sys }] },
-    contents: chatLog.slice(-8).map(m => ({ role: m.role === 'u' ? 'user' : 'model', parts: [{ text: m.text }] }))
-      .concat([{ role: 'user', parts: [{ text: userText }] }]),
-    generationConfig: { responseMimeType: 'application/json', temperature: 0.4, maxOutputTokens: 800 },
+    contents: await buildContents(userText, images),
+    generationConfig: { responseMimeType: 'application/json', temperature: 0.4, maxOutputTokens: L.tokens },
   };
-  const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  if (!res.ok) {
-    const detail = await res.text().catch(() => '');
-    throw new Error(`API ${res.status}: ${detail.slice(0, 160)}`);
+
+  aiAbort = new AbortController();
+  const ac = aiAbort;
+  let timedOut = false;
+  const timeoutMs = L.tokens > 2000 ? 120000 : 60000;
+  const timer = setTimeout(() => { timedOut = true; ac.abort(); }, timeoutMs);
+
+  let json = '', shown = '', finish = '', usage = null;
+  const feed = (text) => {
+    for (const line of text.split('\n')) {
+      const t = line.trim();
+      if (!t.startsWith('data:')) continue;
+      const payload = t.slice(5).trim();
+      if (!payload || payload === '[DONE]') continue;
+      let chunk;
+      try { chunk = JSON.parse(payload); } catch (_) { continue; }
+      const c = chunk.candidates?.[0];
+      json += (c?.content?.parts || []).map(p => p.text || '').join('');
+      if (c?.finishReason) finish = c.finishReason;
+      if (chunk.usageMetadata) usage = chunk.usageMetadata;
+      const partial = partialJsonString(json, 'reply');
+      if (onDelta && partial && partial !== shown) { shown = partial; onDelta(partial); }
+    }
+  };
+
+  try {
+    const res = await fetch(t.url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...t.headers },
+      body: JSON.stringify(body),
+      signal: aiAbort.signal,
+    });
+    if (!res.ok) throw await apiError(res);
+
+    if (res.body && res.body.getReader) {
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buf = '';
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        const cut = buf.lastIndexOf('\n');
+        if (cut < 0) continue;
+        feed(buf.slice(0, cut));
+        buf = buf.slice(cut + 1);
+      }
+      if (buf.trim()) feed(buf);
+    } else {
+      feed(await res.text());       // stream support na thakle ek shathe
+    }
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      /* timeout ar user er Stop — duita alada jinish, alada bhabe handle korte hobe */
+      if (timedOut) throw new Error(`${Math.round(timeoutMs / 1000)}s eo API uttor dilo na. Net ba model dekho.`);
+      const err = new Error('Thamano hoyeche');
+      err.aborted = true; err.partial = shown;
+      throw err;
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
+    aiAbort = null;
   }
-  const data = await res.json();
-  const txt = data?.candidates?.[0]?.content?.parts?.map(p => p.text).join('') || '';
-  if (!txt) throw new Error('LLM khali uttor dilo');
+
+  trackUsage(usage);
+
   let out;
-  try { out = JSON.parse(txt); }
-  catch (e) { throw new Error('LLM er JSON pora gelo na: ' + txt.slice(0, 120)); }
+  try { out = JSON.parse(json); }
+  catch (_) {
+    if (!shown) throw new Error('AI er uttor ta pora gelo na — abar chesta koro');
+    out = { reply: shown, actions: [], chips: [] };    // JSON kete geche, text tuku bachai
+  }
+  out._finish = finish;
   return out;
 }
 
@@ -827,39 +1204,109 @@ Shudhu ei JSON format e uttor dao: {"reply":"...","actions":[{"name":"task_add",
    CHAT ENGINE
    ============================================================ */
 function pushMsg(role, text, extra = {}) {
-  const m = { role, text, ts: Date.now(), ...extra };
+  const m = { mid: uid(), role, text, ts: Date.now(), ...extra };
   chatLog.push(m); saveChat(); renderChat();
   return m;
 }
 
-async function handleUserText(raw) {
-  const text = String(raw || '').trim();
-  if (!text) return;
-  pushMsg('u', text);
-  setTyping(true);
-
+/**
+ * Ek dfa AI turn — streaming reply, tarpor action gulo chalay.
+ * `true` ferot dile AI parlo; `false` dile caller offline brain e chole jabe.
+ */
+async function runAiTurn(text, images) {
+  const holder = pushMsg('b', '', { via: 'ai', streaming: true, src: { text, imgs: (images || []).map(i => i.id) } });
+  setStreaming(true);
   try {
-    if (aiCfg.on && aiCfg.key && navigator.onLine) {
-      try {
-        let memCtx = '';
-        if (typeof RAG !== 'undefined' && RAG.ready) {
-           const mems = await RAG.search(text, 3);
-           if (mems.length) memCtx = mems.map(m => '- ' + m.text).join('\n');
-        }
-        const out = await askLLM(text, memCtx);
-        const results = [];
-        for (const a of (out.actions || [])) results.push(await runAction(a.name, a.args));
-        const extra = results.filter(r => r && r.text && !r.silent).map(r => r.text).join('\n');
-        const reply = [out.reply, extra].filter(Boolean).join('\n\n') || 'Hoye gelo ✅';
-        pushMsg('b', reply, { chips: out.chips || [], via: 'ai' });
-        return;
-      } catch (e) {
-        console.warn('[persona-ai] LLM fail, offline brain e ferot', e);
-        pushMsg('b', `⚠️ AI mode kaj korlo na (${e.message}). Nijer brain diye korchi.`, { warn: true });
-      }
+    let memCtx = '';
+    if (typeof RAG !== 'undefined' && RAG.ready) {
+      const mems = await RAG.search(text, 3);
+      if (mems.length) memCtx = mems.map(m => '- ' + m.text).join('\n');
     }
+
+    const out = await askLLM(text, memCtx, images, delta => {
+      holder.text = delta;
+      paintStream(holder);
+    });
+
+    const results = [];
+    for (const a of (out.actions || [])) results.push(await runAction(a.name, a.args));
+    const extra = results.filter(r => r && r.text && !r.silent).map(r => r.text).join('\n');
+
+    holder.text = [out.reply, extra].filter(Boolean).join('\n\n') || 'Hoye gelo ✅';
+    holder.chips = out.chips || [];
+    delete holder.streaming;
+    /* uttor ta token limit e kete gele user ke bolo ki korte hobe */
+    if (out._finish === 'MAX_TOKENS') {
+      holder.chips = [...holder.chips, '⚙️ Uttor er size barao'];
+      holder.truncated = true;
+    }
+    saveChat(); renderChat();
+    return true;
+  } catch (e) {
+    /* user nijei Stop chepeche — eta fail na, tai warn ba offline fallback kichui na */
+    if (e.aborted) {
+      const i = chatLog.indexOf(holder);
+      if (e.partial) {
+        holder.text = e.partial;
+        holder.stopped = true;
+        delete holder.streaming;
+      } else if (i >= 0) {
+        chatLog.splice(i, 1);
+        toast('Thamano holo');
+      }
+      saveChat(); renderChat();
+      return true;
+    }
+    console.warn('[persona-ai] LLM fail, offline brain e ferot', e);
+    const i = chatLog.indexOf(holder);
+    if (i >= 0) chatLog.splice(i, 1);
+    pushMsg('b', `AI mode kaj korlo na — ${e.message}`, { warn: true, retry: true });
+    return false;
+  } finally {
+    setStreaming(false);
+  }
+}
+
+/** Kono AI reply abar generate koray (⟳ button). */
+async function regenerate(mid) {
+  const i = chatLog.findIndex(m => m.mid === mid);
+  if (i < 0) return;
+  const src = chatLog[i].src;
+  if (!src) { toast('Ei message ta abar banano jabe na'); return; }
+  chatLog.splice(i, 1);
+  saveChat(); renderChat();
+  const imgs = [];
+  for (const id of (src.imgs || [])) {
+    const rec = imgCache.get(id) || await IMG.get(id).catch(() => null);
+    if (rec) imgs.push(rec);
+  }
+  await runAiTurn(src.text, imgs);
+}
+
+async function handleUserText(raw, attachments) {
+  const text = String(raw || '').trim();
+  const imgs = attachments || [];
+  if (!text && !imgs.length) return;
+
+  for (const im of imgs) {
+    imgCache.set(im.id, im);
+    try { await IMG.put(im); }
+    catch (e) { console.error('[persona-ai] chobi save fail', im.id, e); }
+  }
+  pushMsg('u', text, imgs.length ? { imgs: imgs.map(i => i.id) } : {});
+
+  const aiReady = aiCfg.on && aiConfigured() && navigator.onLine;
+  if (imgs.length && !aiReady) {
+    pushMsg('b', 'Chobi bujhte AI mode lagbe — ⚙️ theke nijer Gemini key diye AI mode on koro. (Net na thakleo AI cholbe na.)', { warn: true });
+    if (!text) return;
+  }
+
+  setTyping(true);
+  try {
+    if (aiReady && await runAiTurn(text, imgs)) return;
+
     const intent = parseIntent(text);
-    
+
     /* offline RAG memory recall (no LLM required) */
     if ((intent.action === '_unknown' || intent.action === 'web_answer') && typeof RAG !== 'undefined' && RAG.ready) {
        const mems = await RAG.search(text, 1);
@@ -873,6 +1320,7 @@ async function handleUserText(raw) {
     if (!r.silent) pushMsg('b', r.text, { chips: r.chips || [], goto: r.goto, link: r.link });
   } finally {
     setTyping(false);
+    IMG.gc();
   }
 }
 
@@ -887,6 +1335,52 @@ function mdLite(s) {
     .replace(/\n/g, '<br>');
 }
 
+const LEN_CHIP = '⚙️ Uttor er size barao';
+
+function scrollChat() {
+  const box = $('#chatBody');
+  if (box) box.scrollTop = box.scrollHeight;
+}
+
+function imgGridHtml(m) {
+  const ids = m.imgs || [];
+  if (!ids.length) return '';
+  return `<div class="msg-imgs${ids.length === 1 ? ' one' : ''}">${ids.map(id => {
+    const rec = imgCache.get(id);
+    return rec
+      ? `<button class="msg-img" data-img="${esc(id)}" type="button" aria-label="Chobi boro kore dekho"><img src="${rec.thumb}" alt="Pathano chobi"></button>`
+      : `<button class="msg-img ph" data-img="${esc(id)}" type="button" aria-label="Chobi load hocche"></button>`;
+  }).join('')}</div>`;
+}
+
+function msgHtml(m) {
+  const cls = ['msg', m.role === 'u' ? 'me' : 'bot'];
+  if (m.warn) cls.push('warn');
+  if (m.streaming) cls.push('streaming');
+
+  const body = m.streaming && !m.text
+    ? '<span class="think"><i></i><i></i><i></i></span>'
+    : mdLite(m.text) + (m.streaming ? '<span class="caret"></span>' : '');
+
+  const foot = [];
+  if (m.via === 'ai' && !m.streaming) {
+    foot.push(`<button class="msg-act" data-copy="${esc(m.mid || '')}" type="button" title="Copy">Copy</button>`);
+    if (m.src) foot.push(`<button class="msg-act" data-regen="${esc(m.mid || '')}" type="button" title="Abar banao">⟳ Abar</button>`);
+  }
+  if (m.retry) foot.push('<button class="msg-act" data-retry="1" type="button">↻ Abar chesta</button>');
+  if (m.stopped) foot.push('<span class="msg-note">⏹ thamano hoyeche</span>');
+  if (m.truncated) foot.push('<span class="msg-note">uttor ta kete geche</span>');
+
+  return `<div class="${cls.join(' ')}" data-mid="${esc(m.mid || '')}">
+      ${imgGridHtml(m)}
+      <div class="bubble">${body}</div>
+      <div class="msg-foot">
+        ${m.via === 'ai' ? `<span class="msg-tag">${esc(aiCfg.model)}</span>` : ''}
+        ${foot.join('')}
+      </div>
+    </div>`;
+}
+
 function renderChat() {
   const box = $('#chatBody');
   if (!box) return;
@@ -894,15 +1388,26 @@ function renderChat() {
     box.innerHTML = `<div class="chat-intro">
         <div class="chat-intro-ico">✨</div>
         <b>Ami Persona</b>
-        <p>Ja korte chao just likhe dao — kaj, ghum, checklist, note, sob ami kore dibo.</p>
+        <p>Ja korte chao just likhe dao — kaj, ghum, checklist, note, sob ami kore dibo.
+        AI mode on thakle chobi-o pathate paro.</p>
       </div>`;
   } else {
-    box.innerHTML = chatLog.map(m => `
-      <div class="msg ${m.role === 'u' ? 'me' : 'bot'}${m.warn ? ' warn' : ''}">
-        <div class="bubble">${mdLite(m.text)}</div>
-        ${m.via === 'ai' ? '<span class="msg-tag">AI</span>' : ''}
-      </div>`).join('');
+    box.innerHTML = chatLog.map(msgHtml).join('');
   }
+
+  box.querySelectorAll('[data-copy]').forEach(b => b.onclick = () => {
+    const m = chatLog.find(x => x.mid === b.dataset.copy);
+    if (!m) return;
+    navigator.clipboard?.writeText(m.text).then(() => toast('Copy hoye geche'),
+      () => toast('Copy kora gelo na'));
+  });
+  box.querySelectorAll('[data-regen]').forEach(b => b.onclick = () => regenerate(b.dataset.regen));
+  box.querySelectorAll('[data-retry]').forEach(b => b.onclick = () => {
+    const lastUser = [...chatLog].reverse().find(m => m.role === 'u');
+    if (lastUser) regenerateFromUser(lastUser);
+  });
+  box.querySelectorAll('.msg-img').forEach(b => b.onclick = () => openLightbox(b.dataset.img));
+
   /* shesh message er chips */
   const last = chatLog[chatLog.length - 1];
   const chipBox = $('#chatChips');
@@ -910,7 +1415,10 @@ function renderChat() {
     ? last.chips
     : (!chatLog.length ? ['Ki ki kaj baki', 'Aaj kemon gelo', 'Ghumate jachhi', 'Ki korte paro?'] : []);
   chipBox.innerHTML = chips.map(c => `<button class="chat-chip">${esc(c)}</button>`).join('');
-  $$('#chatChips .chat-chip').forEach(b => b.onclick = () => handleUserText(b.textContent));
+  $$('#chatChips .chat-chip').forEach(b => b.onclick = () => {
+    if (b.textContent === LEN_CHIP) { openSettings(); return; }
+    handleUserText(b.textContent);
+  });
   if (last && last.goto) {
     chipBox.insertAdjacentHTML('afterbegin', `<button class="chat-chip go" data-goto-chat="${last.goto}">Dekhao →</button>`);
     const g = chipBox.querySelector('[data-goto-chat]');
@@ -920,7 +1428,98 @@ function renderChat() {
     chipBox.insertAdjacentHTML('afterbegin',
       `<a class="chat-chip go" href="${esc(last.link.url)}" target="_blank" rel="noopener noreferrer">${esc(last.link.label)}</a>`);
   }
-  box.scrollTop = box.scrollHeight;
+  scrollChat();
+  hydrateImgs();
+}
+
+/** IDB theke thumb ene placeholder gulo bhore dey (render sync rakhar jonno alada). */
+async function hydrateImgs() {
+  for (const el of $$('#chatBody .msg-img.ph')) {
+    const id = el.dataset.img;
+    let rec = imgCache.get(id);
+    if (!rec) rec = await IMG.get(id).catch(() => null);
+    el.classList.remove('ph');
+    if (rec) { imgCache.set(id, rec); el.innerHTML = `<img src="${rec.thumb}" alt="Pathano chobi">`; }
+    else { el.classList.add('gone'); el.textContent = '🖼'; el.disabled = true; }
+  }
+}
+
+/** Streaming cholakalin shudhu oi bubble tuku badlai — puro list re-render korle scroll lafai. */
+function paintStream(m) {
+  setTyping(false);
+  const el = $(`#chatBody .msg[data-mid="${m.mid}"] .bubble`);
+  if (!el) { renderChat(); return; }
+  el.innerHTML = mdLite(m.text) + '<span class="caret"></span>';
+  scrollChat();
+}
+
+/** "Abar chesta" — shesh user message ta diye AI turn abar chalay. */
+async function regenerateFromUser(userMsg) {
+  const i = chatLog.findIndex(m => m.warn && m.retry);
+  if (i >= 0) chatLog.splice(i, 1);
+  saveChat(); renderChat();
+  const imgs = [];
+  for (const id of (userMsg.imgs || [])) {
+    const rec = imgCache.get(id) || await IMG.get(id).catch(() => null);
+    if (rec) imgs.push(rec);
+  }
+  setTyping(true);
+  try { await runAiTurn(userMsg.text, imgs); }
+  finally { setTyping(false); }
+}
+
+/* ---------- lightbox ---------- */
+async function openLightbox(id) {
+  const rec = imgCache.get(id) || await IMG.get(id).catch(() => null);
+  if (!rec) { toast('Chobi ta ar nei'); return; }
+  const box = $('#imgLightbox');
+  box.querySelector('img').src = rec.full;
+  box.classList.remove('hidden');
+}
+function closeLightbox() {
+  const box = $('#imgLightbox');
+  if (!box || box.classList.contains('hidden')) return false;
+  box.classList.add('hidden');
+  box.querySelector('img').src = '';
+  return true;
+}
+
+/* ---------- composer attachment tray ---------- */
+function renderAttachTray() {
+  const tray = $('#chatAttach');
+  if (!tray) return;
+  tray.classList.toggle('hidden', !pendingImgs.length);
+  tray.innerHTML = pendingImgs.map(im => `
+    <div class="att">
+      <img src="${im.thumb}" alt="Attach kora chobi">
+      <button class="att-x" type="button" data-drop="${esc(im.id)}" aria-label="Chobi ta shorao">✕</button>
+    </div>`).join('');
+  tray.querySelectorAll('[data-drop]').forEach(b => b.onclick = () => {
+    pendingImgs = pendingImgs.filter(i => i.id !== b.dataset.drop);
+    renderAttachTray();
+  });
+}
+
+async function addFiles(files) {
+  const list = [...files].filter(f => /^image\//.test(f.type || ''));
+  if (!list.length) return;
+  const room = MAX_ATTACH - pendingImgs.length;
+  if (room <= 0) { toast(`Ek message e sorbochcho ${MAX_ATTACH} ta chobi`); return; }
+  if (list.length > room) toast(`Prothom ${room} ta chobi neya holo`);
+  for (const f of list.slice(0, room)) {
+    try { pendingImgs.push(await prepImage(f)); }
+    catch (e) { console.error('[persona-ai] chobi prep fail', e); toast(e.message); }
+  }
+  renderAttachTray();
+}
+
+/** Send button ⇄ Stop button. */
+function setStreaming(on) {
+  const btn = $('#chatSend');
+  if (!btn) return;
+  btn.classList.toggle('stop', on);
+  btn.setAttribute('aria-label', on ? 'Thamao' : 'Pathao');
+  btn.textContent = on ? '■' : '➤';
 }
 
 function setTyping(on) {
@@ -986,33 +1585,205 @@ function initChatHead() {
   window.addEventListener('touchend', up);
 }
 
-/* ---- settings (AI mode) ---- */
+/* ============================================================
+   SETTINGS (AI mode)
+   ============================================================ */
+const CUSTOM_MODEL = '__custom__';
+
+function setStatus(text, kind = '') {
+  const el = $('#aiStatus');
+  if (!el) return;
+  el.textContent = text;
+  el.className = 'set-status' + (kind ? ' ' + kind : '');
+}
+
+function renderModelSelect() {
+  const sel = $('#aiModel');
+  if (!sel) return;
+  const list = [...new Set([...(aiModels.length ? aiModels : FALLBACK_MODELS), aiCfg.model])].filter(Boolean);
+  sel.innerHTML = list.map(m => `<option value="${esc(m)}"${m === aiCfg.model ? ' selected' : ''}>${esc(m)}</option>`).join('')
+    + `<option value="${CUSTOM_MODEL}">Onno model — hate likho…</option>`;
+  sel.value = aiCfg.model;
+  $('#aiModelCustom').classList.add('hidden');
+}
+
+function renderLenSeg() {
+  const box = $('#aiLen');
+  if (!box) return;
+  box.innerHTML = Object.entries(LEN_OPTS).map(([k, v]) =>
+    `<button type="button" class="seg-btn${k === aiCfg.len ? ' on' : ''}" data-len="${k}">${esc(v.label)}</button>`).join('');
+  box.querySelectorAll('[data-len]').forEach(b => b.onclick = () => {
+    aiCfg.len = b.dataset.len; saveAi(); renderLenSeg();
+  });
+  $('#aiLenHint').textContent = `${lenCfg().hint} · sorbochcho ~${lenCfg().tokens} token`;
+}
+
+const fmtTok = (n) => n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k' : String(n);
+
+function renderUsage() {
+  const box = $('#aiUsageBox');
+  if (!box) return;
+  const today = aiUsage[dayKey()] || { req: 0, in: 0, out: 0 };
+  const days = [...Array(7)].map((_, i) => {
+    const d = new Date(); d.setDate(d.getDate() - (6 - i));
+    return aiUsage[dayKey(d)] || { req: 0, in: 0, out: 0 };
+  });
+  const peak = Math.max(1, ...days.map(d => d.in + d.out));
+  box.innerHTML = `
+    <div class="usage-top">
+      <b>${today.req}</b><span>request</span>
+      <b>${fmtTok(today.in + today.out)}</b><span>token</span>
+    </div>
+    <div class="usage-bars" aria-hidden="true">
+      ${days.map((d, i) => {
+        const tok = d.in + d.out;
+        return `<span class="day${i === 6 ? ' today' : ''}">${tok ? `<i style="height:${Math.max(8, Math.round(tok / peak * 100))}%"></i>` : ''}</span>`;
+      }).join('')}
+    </div>
+    <p class="set-status">Shesh 7 din · in ${fmtTok(today.in)} / out ${fmtTok(today.out)} aaj. Chobi pathale token onek beshi lage.</p>`;
+}
+
 function renderAiSettings() {
   $('#aiToggle').checked = !!aiCfg.on;
-  $('#aiKey').value = aiCfg.key || '';
-  $('#aiModel').value = aiCfg.model || 'gemini-2.5-flash';
-  $('#chatModeTag').textContent = aiCfg.on && aiCfg.key ? 'AI mode' : 'Offline brain';
-  $('#chatModeTag').classList.toggle('on', !!(aiCfg.on && aiCfg.key));
+
+  /* default key ta input e dekhai na — khali rekhe placeholder e bujhiye di,
+     jate bhul kore edit/leak na hoy. Notun key likhle-i override hoye jabe. */
+  const dflt = usingDefaultKey();
+  const keyBox = $('#aiKey');
+  keyBox.value = dflt ? '' : (aiCfg.key || '');
+  keyBox.placeholder = dflt
+    ? 'Default key cholche'
+    : 'Gemini API key (aistudio.google.com)';
+  $('#aiKeyReset').classList.toggle('hidden', dflt || !DEFAULT_KEY);
+  $('#aiPass').value = aiCfg.pass || '';
+  if (usingProxy()) setStatus('Cloud proxy diye cholche — key server e ✓', 'ok');
+  else if (dflt) setStatus('Default key (config.local.js) cholche ✓', 'ok');
+  else if (!aiConfigured()) setStatus('Passphrase ba nijer key — jekono ekta dao.');
+
+  renderModelSelect();
+  renderLenSeg();
+  renderUsage();
+  const live = !!(aiCfg.on && aiConfigured());
+  $('#chatModeTag').textContent = live ? aiCfg.model : 'Offline brain';
+  $('#chatModeTag').classList.toggle('on', live);
+}
+
+function openSettings() {
+  $('#chatSettings').classList.remove('hidden');
+  renderAiSettings();
+}
+
+/** Key ta thik ki na ekta chhoto call diye jachai kore — bhul key niye chup thakar cheye bhalo. */
+async function verifyKey() {
+  if (!aiConfigured()) { setStatus('Key ba passphrase dao — tarpor ami connection test kore dibo.'); return; }
+  setStatus('Connection check korchi…');
+  try {
+    const list = await fetchModels();
+    if (!list.includes(aiCfg.model)) {
+      const alt = list.find(m => m.includes('flash')) || list[0];
+      setStatus(`Connected ✓ — kintu "${aiCfg.model}" ei key te nei, tai "${alt}" set korlam.`, 'warn');
+      aiCfg.model = alt; saveAi();
+    } else {
+      setStatus(`Connected ✓ · ${list.length} ta model pawa gelo`, 'ok');
+    }
+    renderModelSelect();
+    $('#chatModeTag').textContent = aiCfg.on && aiConfigured() ? aiCfg.model : 'Offline brain';
+  } catch (e) {
+    setStatus(e.message, 'bad');
+  }
 }
 
 function initChatUI() {
   $('#chatClose').onclick = closeChat;
+
   $('#chatForm').onsubmit = e => {
     e.preventDefault();
+    if (aiAbort) { aiAbort.abort(); return; }      // streaming cholakalin ei button = Stop
     const v = $('#chatInput').value;
+    const imgs = pendingImgs;
     $('#chatInput').value = '';
-    handleUserText(v);
+    pendingImgs = [];
+    renderAttachTray();
+    handleUserText(v, imgs);
   };
+
+  /* ---- chobi attach: button, paste, drag-drop ---- */
+  $('#chatAttachBtn').onclick = () => $('#chatFile').click();
+  $('#chatFile').onchange = e => { addFiles(e.target.files); e.target.value = ''; };
+  $('#chatPanel').addEventListener('paste', e => {
+    const files = [...(e.clipboardData?.files || [])];
+    if (files.length) { e.preventDefault(); addFiles(files); }
+  });
+  $('#chatPanel').addEventListener('dragover', e => { e.preventDefault(); $('#chatPanel').classList.add('drop'); });
+  $('#chatPanel').addEventListener('dragleave', () => $('#chatPanel').classList.remove('drop'));
+  $('#chatPanel').addEventListener('drop', e => {
+    e.preventDefault();
+    $('#chatPanel').classList.remove('drop');
+    addFiles(e.dataTransfer?.files || []);
+  });
+
+  /* ---- settings ---- */
   $('#chatGear').onclick = () => { $('#chatSettings').classList.toggle('hidden'); renderAiSettings(); };
   $('#aiToggle').onchange = e => { aiCfg.on = e.target.checked; saveAi(); renderAiSettings(); };
-  $('#aiKey').onchange = e => { aiCfg.key = e.target.value.trim(); saveAi(); renderAiSettings(); };
-  $('#aiModel').onchange = e => { aiCfg.model = e.target.value.trim() || 'gemini-2.5-flash'; saveAi(); };
-  $('#chatClear').onclick = () => { chatLog = []; saveChat(); renderChat(); };
+  $('#aiKey').onchange = e => {
+    const v = e.target.value.trim();
+    /* khali kore dile default key thakle sekhane-i ferot jai, AI mode mora rakhi na */
+    aiCfg.key = v || DEFAULT_KEY;
+    if (aiCfg.key) aiCfg.on = true;
+    saveAi(); renderAiSettings();
+    if (v) verifyKey();
+  };
+  $('#aiPass').onchange = e => {
+    aiCfg.pass = e.target.value.trim();
+    if (aiCfg.pass) aiCfg.on = true;
+    saveAi(); renderAiSettings();
+    if (aiCfg.pass) verifyKey();          // passphrase thik ki na ekhoni jachai kore di
+  };
+  $('#aiKeyReset').onclick = () => {
+    aiCfg.key = DEFAULT_KEY; aiCfg.on = !!DEFAULT_KEY;
+    saveAi(); renderAiSettings();
+    toast('Default key e ferot');
+  };
+  $('#aiModel').onchange = e => {
+    if (e.target.value === CUSTOM_MODEL) {
+      const inp = $('#aiModelCustom');
+      inp.classList.remove('hidden'); inp.value = aiCfg.model; inp.focus();
+      return;
+    }
+    aiCfg.model = e.target.value; saveAi(); renderAiSettings();
+  };
+  $('#aiModelCustom').onchange = e => {
+    const v = e.target.value.trim();
+    if (!v) return;
+    aiCfg.model = v; saveAi(); renderAiSettings();
+  };
+  $('#aiModelRefresh').onclick = async () => {
+    const btn = $('#aiModelRefresh');
+    btn.disabled = true; setStatus('Model list anchi…');
+    try {
+      const list = await fetchModels();
+      renderModelSelect();
+      setStatus(`${list.length} ta model pawa gelo ✓`, 'ok');
+    } catch (e) { setStatus(e.message, 'bad'); }
+    finally { btn.disabled = false; }
+  };
+
+  $('#chatClear').onclick = () => {
+    chatLog = []; saveChat(); renderChat(); IMG.gc();
+  };
+  $('#imgLightbox').onclick = closeLightbox;
   $('#openChatBtn').onclick = () => { closeSheet(); openChat(); };
-  document.addEventListener('keydown', e => { if (e.key === 'Escape' && chatOpen) closeChat(); });
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    if (closeLightbox()) return;
+    if (chatOpen) closeChat();
+  });
+
   initChatHead();
   renderAiSettings();
   renderChat();
+  renderAttachTray();
+  IMG.gc();
   handleLaunchParams();
 }
 

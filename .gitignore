@@ -2,6 +2,9 @@
 .claude/settings.local.json
 .claude/*.tmp.*
 
+# nijer Gemini API key ekhane thake — kokhono commit hobe na
+config.local.js
+
 # deps / build (ei project e build step nei, tobu bhul kore jate na dhoke)
 node_modules/
 dist/
@@ -10,3 +13,6 @@ dist/
 # OS junk
 .DS_Store
 Thumbs.db
+
+# wrangler local state
+.wrangler/

@@ -423,15 +423,52 @@
 
     <!-- AI settings -->
     <div id="chatSettings" class="chat-settings hidden">
-      <label class="switch-row">
-        <span>AI mode (nijer Gemini key)</span>
-        <input type="checkbox" id="aiToggle" />
-      </label>
-      <input type="password" id="aiKey" placeholder="Gemini API key (aistudio.google.com)" autocomplete="off" />
-      <input type="text" id="aiModel" placeholder="gemini-2.5-flash" autocomplete="off" />
+      <section class="set-sec">
+        <h4 class="set-h">AI mode</h4>
+        <label class="switch-row">
+          <span>Nijer Gemini key diye AI</span>
+          <input type="checkbox" id="aiToggle" />
+        </label>
+        <div class="set-row">
+          <input type="password" id="aiKey" placeholder="Gemini API key (aistudio.google.com)" autocomplete="off" />
+          <button type="button" id="aiKeyReset" class="btn btn-ghost btn-sm hidden">Default</button>
+        </div>
+        <p id="aiStatus" class="set-status">Key dao — tarpor ami connection test kore dibo.</p>
+      </section>
+
+      <section class="set-sec">
+        <h4 class="set-h">Cloud access</h4>
+        <input type="password" id="aiPass" placeholder="Passphrase (ei device e ekbar)" autocomplete="off" />
+        <p class="set-status">
+          Hosted version e key ta server e thake — ei passphrase ta diyei sob device
+          theke chalate parba. Nijer key hate dile eta lagbe na.
+        </p>
+      </section>
+
+      <section class="set-sec">
+        <h4 class="set-h">Model</h4>
+        <div class="set-row">
+          <select id="aiModel" class="set-select" aria-label="Gemini model"></select>
+          <button type="button" id="aiModelRefresh" class="btn btn-ghost btn-sm">Refresh</button>
+        </div>
+        <input type="text" id="aiModelCustom" class="hidden" placeholder="Model ID hate likho" autocomplete="off" />
+      </section>
+
+      <section class="set-sec">
+        <h4 class="set-h">Uttor er size</h4>
+        <div id="aiLen" class="seg" role="group" aria-label="Uttor er size"></div>
+        <p id="aiLenHint" class="set-status"></p>
+      </section>
+
+      <section class="set-sec">
+        <h4 class="set-h">Usage</h4>
+        <div id="aiUsageBox" class="usage"></div>
+      </section>
+
       <p class="chat-settings-note">
-        Key ta shudhu ei phone-er localStorage e thake, kothao pathai na. Off thakle ba net na thakle
-        offline brain-i sob kaj kore.
+        Key ta shudhu ei phone-er localStorage e thake. AI mode on thakle tomar message ar
+        attach kora chobi Google er Gemini API te jay — off thakle ba net na thakle kichui
+        phone er baire jay na, offline brain-i sob kaj kore.
       </p>
       <button id="chatClear" class="btn btn-ghost btn-block">Chat history muche felo</button>
     </div>
@@ -441,13 +478,23 @@
     <div id="chatTyping" class="chat-typing hidden"><span></span><span></span><span></span></div>
     <div id="chatChips" class="chat-chips"></div>
 
+    <div id="chatAttach" class="chat-attach hidden"></div>
+
     <form id="chatForm" class="chat-composer">
-      <input type="text" id="chatInput" placeholder="Ja korte hobe likhe dao…" autocomplete="off" />
-      <button type="submit" class="chat-send" aria-label="Pathao">➤</button>
+      <input type="file" id="chatFile" accept="image/*" multiple hidden />
+      <button type="button" id="chatAttachBtn" class="chat-attach-btn" aria-label="Chobi attach koro">＋</button>
+      <input type="text" id="chatInput" placeholder="Likhe dao, ba chobi attach koro…" autocomplete="off" />
+      <button type="submit" id="chatSend" class="chat-send" aria-label="Pathao">➤</button>
     </form>
+
+    <div id="imgLightbox" class="img-lightbox hidden" role="dialog" aria-modal="true" aria-label="Chobi">
+      <img alt="Boro kore dekhano chobi" />
+    </div>
   </div>
 
   <div id="toast" class="toast hidden"></div>
+  <!-- nijer key (gitignored). File ta na thakleo app cholbe — settings theke key dewa jabe. -->
+  <script src="config.local.js" onerror="console.info('[persona] config.local.js nei — settings theke key dite hobe')"></script>
   <script src="app.js"></script>
   <script src="alarm.js"></script>
   <script src="chat.js"></script>

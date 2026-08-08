@@ -50,7 +50,66 @@ Duita mode:
 Notun capability add korle: `ACTIONS` e ekta entry, `LLM_TOOLS` string e tar
 description, ar offline `parseIntent()` e keyword — tinta jaygatei lagbe.
 
+### AI mode — key kothay thake (duita rasta)
+`apiTarget()` thik kore Gemini call kothay jabe:
+
+1. **Nijer key hate thakle → sorasori Google e.** Local dev er jonno;
+   key ashe `config.local.js` (gitignored) theke.
+2. **Key na thakle → `/api/gemini` proxy.** Ei ta hosted (Cloudflare Pages)
+   er rasta — key thake Cloudflare secret e, browser e kokhono jay na.
+   Gate: `x-persona-pass` header, `aiCfg.pass` theke.
+
+**Keno duita:** repo public ar site public URL e. Key browser e pathale je
+keu devtools khule niye nito. Proxy tao public, tai passphrase gate — protita
+device e ekbar dile-i hoy (office/basha/phone sob jaygay ek-i passphrase).
+
+`functions/api/gemini/[[path]].js` — Cloudflare Pages Function. `models` ar
+`models/<model>:streamGenerateContent` chara onno path proxy kore na (404).
+Response body stream kore pass kore, na hole SSE er live typing noshto hoto.
+Cloudflare Pages → Settings → Environment variables e **secret** hishebe lagbe:
+`GEMINI_KEY` ar `PERSONA_PASS`. Local e test: `npx wrangler pages dev .
+--binding GEMINI_KEY=… PERSONA_PASS=…`
+
+`sw.js` `/api/*` bypass kore — na hole net gele API error er bodole HTML shell
+ferot ashto.
+
+### AI mode (LLM) er baki detail
+- **Default key (local only)** — `config.local.js` (gitignored) `window.PERSONA_CONFIG =
+  { key, model }` set kore; thakle app kichu na kore-i AI mode on hoye chole.
+  Template: `config.local.example.js` (eta committed, key faka).
+  Settings theke onno key dile shetai jite (localStorage), "Default" button
+  chaple abar config er key te ferot ashe. **Key kokhono repo te commit hobe na.**
+- **`aiCfg`** (`shathi.ai`): `{ on, key, model, len }`. Default model
+  `gemini-3.6-flash`; purono `gemini-2.5-flash` load-e migrate hoye jay.
+  `len` = `short|mid|long|full` → `LEN_OPTS` theke `maxOutputTokens` ar
+  system-prompt er length instruction dutoi ashe.
+- **Model list live** — `fetchModels()` `GET /v1beta/models` kore, `generateContent`
+  support kore emon gulo `shathi.aiModels` e cache kore dropdown e boshay.
+  Model naam hardcode korar dorkar nei; `FALLBACK_MODELS` shudhu fetch fail hole.
+- **Streaming** — `:streamGenerateContent?alt=sse`. Response JSON mode e ashe,
+  tai `partialJsonString()` adhek-asha JSON theke `reply` tuku ber kore live
+  dekhay. Stream shesh hole puro JSON parse kore `actions` chole.
+- **Abort** — `aiAbort` (AbortController) global. Streaming cholakalin send
+  button-i Stop. Timeout ar user-Stop alada: timeout normal error, Stop chup kore
+  batil (warn ba offline fallback hoy na).
+- **Error** — `apiError(res)` status → `ERR_MAP` er Banglish message. Raw API
+  dump kokhono bubble e dekhabe na.
+- **Usage** — response er `usageMetadata` `shathi.aiUsage` e din-wise joma
+  (`{ 'YYYY-MM-DD': {req,in,out} }`, 30 din rakhe), settings e chart hoye dekhay.
+
+### Chobi (vision)
+- Attach: `＋` button / paste / drag-drop → `prepImage()` canvas diye long-edge
+  1152px JPEG e namay (sathe 240px thumb). **Canvas e age sada fill kora hoy** —
+  JPEG e alpha nei, na korle transparent PNG kalo hoye jay.
+- **Storage: `IMG` — IndexedDB `PersonaImgDB`/`imgs`.** base64 kokhono
+  `localStorage` e jabe na (quota shesh hoye jabe); `chatLog` e shudhu
+  `imgs: [id]`. `IMG.gc()` orphan chobi muche dey.
+- Request e sob mile `MAX_CTX_IMGS` (4) tar beshi chobi jay na — token cost cap.
+
 ## Security
 - **API key user er nijer**, `localStorage` e thake, shudhu Google er
   endpoint e jay. Repo te kono key nei ebong kokhono commit korbe na.
+- AI mode on thakle **user er message ar attach kora chobi Google er Gemini API
+  te jay** — chat settings er note e eta explicit bola ache. Off thakle kichui
+  phone er baire jay na.
 - `.claude/settings.local.json` local-only, gitignored.
