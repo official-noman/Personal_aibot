@@ -11,7 +11,9 @@
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <link rel="icon" href="icons/icon-192.png" />
+  <link rel="preload" href="styles.css" as="style" />
   <link rel="stylesheet" href="styles.css" />
+  <link rel="preload" href="app.js" as="script" />
   <title>Persona</title>
 </head>
 <body>
@@ -66,6 +68,7 @@
 
         <div class="section-head"><h3>Aajker kaj</h3><button class="link-btn" data-goto="tasks">Shob →</button></div>
         <div id="homeTasks" class="list"></div>
+        <div id="homeDataSummary" class="data-summary-bar"></div>
 
         <div class="section-head"><h3>Aaj ki ki korlam</h3><button class="link-btn" data-goto="checklist">Checklist →</button></div>
         <div id="homeChecklist" class="chip-wrap"></div>
@@ -171,8 +174,11 @@
       <!-- ============ NOTES ============ -->
       <section class="view hidden" data-view="notes">
         <form id="noteForm" class="input-card">
-          <textarea id="noteText" rows="3" placeholder="Ja mone rakhte chao lekho…" required></textarea>
-          <button type="submit" class="btn btn-primary btn-block">Note save</button>
+          <textarea id="noteText" rows="3" placeholder="Ki mone ache… (Ctrl+Enter = Save)" required></textarea>
+          <div class="input-row" style="justify-content:space-between;align-items:center">
+            <span id="noteCharCount" style="font-size:11px;color:var(--haze)"></span>
+            <button type="submit" class="btn btn-primary">Save</button>
+          </div>
         </form>
         <input type="search" id="noteSearch" class="search" placeholder="🔍 Note khojo…" />
         <div id="noteList" class="list"></div>
@@ -183,10 +189,12 @@
         <form id="sheetForm" class="input-card">
           <div class="field-label">Excel/Sheet style row</div>
           <input type="datetime-local" id="sheetTime" aria-label="Tarikh o shomoy" />
-          <input type="text" id="sheetTitle" placeholder="Title / kaj / entry" autocomplete="off" />
+          <input type="text" id="sheetTitle" placeholder="Title / kaj / entry" autocomplete="off" list="sheetTitleList" />
+          <datalist id="sheetTitleList"></datalist>
           <textarea id="sheetNote" rows="3" placeholder="Details / note…" ></textarea>
           <div class="input-row">
-            <input type="text" id="sheetCat" placeholder="Category (optional)" autocomplete="off" />
+            <input type="text" id="sheetCat" placeholder="Category (optional)" autocomplete="off" list="sheetCatList" />
+            <datalist id="sheetCatList"></datalist>
             <button type="submit" id="sheetSaveBtn" class="btn btn-primary">Save</button>
           </div>
         </form>
@@ -306,8 +314,10 @@
       <button class="sheet-item" id="themeToggleBtn"><span>☀️</span><div><b>Light mode</b><small>Diner jonno white UI</small></div></button>
       <button class="sheet-item" id="geoNavBtn"><span>📍</span><div><b>Radars</b><small>Jaygay gele reminder — geo-fencing</small></div></button>
       <button class="sheet-item" id="alarmSettingsBtn"><span>⏰</span><div><b>Alarm &amp; ringtone</b><small>Awaj, vibration, snooze — test koro</small></div></button>
+      <button class="sheet-item" id="cloudShareBtn"><span>☁️</span><div><b>Cloud/Share e rakho</b><small>Drive, WhatsApp ba Telegram e file pathao</small></div></button>
       <button class="sheet-item" id="exportBtn"><span>⬇️</span><div><b>Backup neya</b><small>Sob data file e save koro</small></div></button>
       <button class="sheet-item" id="importBtn"><span>⬆️</span><div><b>Backup fera</b><small>File theke data restore koro</small></div></button>
+      <button class="sheet-item hidden" id="restoreSnapshotBtn"><span>🔄</span><div><b>Auto-Backup fera</b><small>Bhul theke bachte ager diner data</small></div></button>
       <input type="file" id="importFile" accept="application/json" class="hidden" />
     </div>
   </div>
@@ -494,11 +504,11 @@
 
   <div id="toast" class="toast hidden"></div>
   <!-- nijer key (gitignored). File ta na thakleo app cholbe — settings theke key dewa jabe. -->
-  <script src="config.local.js" onerror="console.info('[persona] config.local.js nei — settings theke key dite hobe')"></script>
+  <script src="config.local.js" onerror="console.info('[persona] config.local.js nei')"></script>
   <script src="app.js"></script>
-  <script src="alarm.js"></script>
-  <script src="chat.js"></script>
-  <script src="geo.js"></script>
-  <script src="memory.js"></script>
+  <script src="alarm.js" defer></script>
+  <script src="chat.js" defer></script>
+  <script src="geo.js" defer></script>
+  <script src="memory.js" defer></script>
 </body>
 </html>

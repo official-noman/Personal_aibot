@@ -1,5 +1,5 @@
 /* Persona service worker — offline caching + notification clicks */
-const CACHE = 'persona-v19';
+const CACHE = 'persona-v20';
 const ASSETS = [
   './',
   './index.html',
@@ -27,16 +27,22 @@ self.addEventListener('activate', (e) => {
   );
 });
 
-/* Cache-first for app shell; network fallback for everything else. */
+/* Cache-first for app shell; network-first for fonts; skip API. */
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
-  /* /api/* (Gemini proxy) kokhono cache ba shell-fallback kora jabe na —
-     na hole net gele API error er bodole HTML shell ferot ashto. */
   if (new URL(e.request.url).pathname.startsWith('/api/')) return;
+  // Fonts: network-first so updates apply
+  if (e.request.url.includes('/fonts/')) {
+    e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
+    return;
+  }
   e.respondWith(
     caches.match(e.request).then((cached) =>
       cached ||
-      fetch(e.request).catch(() => caches.match('./'))
+      fetch(e.request).then(resp => {
+        // Dynamically cache new assets (icons, etc)
+        return caches.open(CACHE).then(c => { c.put(e.request, resp.clone()); return resp; });
+      }).catch(() => caches.match('./'))
     )
   );
 });

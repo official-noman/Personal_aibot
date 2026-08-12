@@ -56,6 +56,9 @@ const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 const dayKey = (d = new Date()) => d.toLocaleDateString('en-CA');
 const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function linkify(text) {
+  return esc(text).replace(/(https?:\/\/[^\s]+)/g, url => `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`);
+}
 
 function toast(msg) {
   const t = $('#toast'); t.textContent = msg; t.classList.remove('hidden');
@@ -199,6 +202,22 @@ function renderHome() {
   const lastSleep = [...sleeps].sort((a, b) => b.date.localeCompare(a.date))[0];
   $('#statSleep').textContent = lastSleep ? lastSleep.hours + 'h' : '–';
 
+  // data summary hint
+  const doneTasks = tasks.filter(t => t.done);
+  const oldDone = doneTasks.filter(t => t.created && (Date.now() - t.created) > 30 * 24 * 3600 * 1000);
+  const summaryEl = $('#homeDataSummary');
+  if (summaryEl) {
+    const total = tasks.length + notes.length + sheetRows.length + pins.length;
+    let hint = `📦 ${total} total data — ${tasks.filter(t=>!t.done).length} active task, ${notes.length} note, ${sheetRows.length} sheet entry`;
+    if (oldDone.length >= 5) hint += ` · <span style="color:var(--amber)">${oldDone.length}ta purono done task ache — <b data-act="cleandone" style="cursor:pointer;text-decoration:underline">clean koro</b></span>`;
+    summaryEl.innerHTML = hint;
+    summaryEl.querySelector('[data-act="cleandone"]')?.addEventListener('click', () => {
+      if (!confirm(`${oldDone.length}ta 30 diner beshi purono done task delete korben?`)) return;
+      tasks = tasks.filter(t => !oldDone.find(o => o.id === t.id));
+      save.tasks(); renderHome(); toast(`${oldDone.length}ta purono task clean holo 🧹`);
+    });
+  }
+
   // check-in prompt
   const h = new Date().getHours();
   const kind = h < 12 ? 'morning' : (h >= 18 ? 'evening' : null);
@@ -274,7 +293,10 @@ function addTask(title, due) {
   save.tasks(); toast('Kaj add holo'); render(currentView); checkDueTasks();
 }
 function toggleTask(id) { const t = tasks.find(x => x.id === id); if (!t) return; t.done = !t.done; if (t.done) t.notified = true; save.tasks(); render(currentView); }
-function delTask(id) { tasks = tasks.filter(x => x.id !== id); save.tasks(); render(currentView); toast('Kaj muche gelo'); }
+function delTask(id) { 
+  if (!confirm('Kaj ti delete korben?')) return;
+  tasks = tasks.filter(x => x.id !== id); save.tasks(); render(currentView); toast('Kaj muche gelo'); 
+}
 $('#taskForm').onsubmit = e => {
   e.preventDefault();
   const title = $('#taskTitle').value, time = $('#taskTime').value;
@@ -355,7 +377,7 @@ function openWake() {
       <div class="wake-card" style="animation-delay:${.1 + i * .08}s">
         <div class="pin-cat-tag">${esc(catLabel(p.cat))}</div>
         ${p.title ? `<div class="wake-card-title">${esc(p.title)}</div>` : ''}
-        <div class="wake-card-text">${esc(p.text)}</div>
+        <div class="wake-card-text">${linkify(p.text)}</div>
       </div>`).join('');
   } else {
     wc.innerHTML = `<div class="wake-card"><div class="wake-card-text">Uthe dekhar jonno kichu pin korona.<br>"Uthe ja dekhbo" theke dua / niyom add koro.</div></div>`;
@@ -401,6 +423,7 @@ function renderSleep() {
       <div class="item-meta">${esc(new Date(s.date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' }))}${s.note ? ' · ' + esc(s.note) : ''}</div>
     </div><button class="del" data-act="del">🗑</button></div>`).join('') : `<div class="empty">Ekhono kono ghum log korona.</div>`;
   $$('#sleepList .item').forEach(el => el.querySelector('[data-act="del"]').onclick = () => {
+    if (!confirm('Ei ghum log ti delete korben?')) return;
     sleeps = sleeps.filter(x => x.id !== el.dataset.id); save.sleeps(); renderSleep(); toast('Muche gelo');
   });
 }
@@ -463,6 +486,7 @@ function renderClManage() {
   ml.innerHTML = clItems.length ? clItems.map(it => `<span class="chip del-chip" data-del="${it.id}">${it.emoji || '•'} ${esc(it.label)}</span>`).join('')
     : `<div class="chip-empty">Ekhono kono option nei.</div>`;
   $$('#checklistManageList .del-chip').forEach(c => c.onclick = () => {
+    if (!confirm('Ei option ti checklist theke delete korben?')) return;
     clItems = clItems.filter(x => x.id !== c.dataset.del);
     save.clItems(); renderChecklist(); toast('Option baad');
   });
@@ -525,6 +549,7 @@ function renderCheckin() {
     </div><button class="del" data-act="del">🗑</button></div>`;
   }).join('') : `<div class="empty">Ekhono kono check-in nei.</div>`;
   $$('#checkinList .item').forEach(el => el.querySelector('[data-act="del"]').onclick = () => {
+    if (!confirm('Check-in delete korben?')) return;
     checkins = checkins.filter(x => x.id !== el.dataset.id); save.checkins(); renderCheckin();
   });
 }
@@ -548,11 +573,12 @@ function renderNotes() {
   if (noteQuery) { const q = noteQuery.toLowerCase(); list = list.filter(n => n.text.toLowerCase().includes(q)); }
   box.innerHTML = list.length ? list.map(n => `
     <div class="item" data-id="${n.id}"><div class="item-body">
-      <div class="note-text">${esc(n.text)}</div>
+      <div class="note-text">${linkify(n.text)}</div>
       <div class="item-meta">${esc(new Date(n.ts).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true }))}</div>
     </div><button class="del" data-act="del">🗑</button></div>`).join('')
     : `<div class="empty">${noteQuery ? 'Kichu pawa gelo na.' : 'Ekhono kono note nei.'}</div>`;
   $$('#noteList .item').forEach(el => el.querySelector('[data-act="del"]').onclick = () => {
+    if (!confirm('Ei note ti delete korben?')) return;
     notes = notes.filter(x => x.id !== el.dataset.id); save.notes(); renderNotes(); toast('Note muche gelo');
   });
 }
@@ -560,8 +586,19 @@ $('#noteForm').onsubmit = e => {
   e.preventDefault();
   const text = $('#noteText').value.trim(); if (!text) return;
   notes.push({ id: uid(), text, ts: Date.now() });
-  save.notes(); e.target.reset(); toast('Note save holo'); renderNotes();
+  save.notes(); e.target.reset(); updateNoteCounter(); toast('Note save holo'); renderNotes();
 };
+function updateNoteCounter() {
+  const ta = $('#noteText'), counter = $('#noteCharCount');
+  if (!ta || !counter) return;
+  const len = ta.value.length;
+  counter.textContent = len > 0 ? `${len} char` : '';
+  counter.style.color = len > 800 ? 'var(--amber)' : 'var(--haze)';
+}
+$('#noteText')?.addEventListener('input', updateNoteCounter);
+$('#noteText')?.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); $('#noteForm').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); }
+});
 $('#noteSearch').addEventListener('input', e => { noteQuery = e.target.value; renderNotes(); });
 
 /* ============================================================
@@ -573,6 +610,17 @@ function addSheetRow({ when, title, note, cat }) {
   const iso = when ? new Date(when).toISOString() : new Date().toISOString();
   sheetRows.push({ id: uid(), when: iso, title: (title || '').trim(), note: (note || '').trim(), cat: (cat || 'General').trim(), ts: Date.now() });
   save.sheetRows();
+  updateSheetCatSuggestions();
+}
+function updateSheetCatSuggestions() {
+  const dl = $('#sheetCatList');
+  if (!dl) return;
+  const cats = [...new Set(sheetRows.map(r => r.cat).filter(Boolean))];
+  dl.innerHTML = cats.map(c => `<option value="${esc(c)}"></option>`).join('');
+  const tdl = $('#sheetTitleList');
+  if (!tdl) return;
+  const titles = [...new Set(sheetRows.map(r => r.title).filter(Boolean))];
+  tdl.innerHTML = titles.map(t => `<option value="${esc(t)}"></option>`).join('');
 }
 function renderSheet() {
   const box = $('#sheetList');
@@ -610,7 +658,7 @@ function renderSheet() {
             <div class="sheet-row" data-id="${r.id}">
               <div class="sheet-date">${esc(new Date(r.when).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: '2-digit', hour: 'numeric', minute: '2-digit', hour12: true }))}</div>
               <div class="sheet-main">
-                <div class="sheet-note">${esc(r.note || 'Kono details nei')}</div>
+                <div class="sheet-note">${r.note ? linkify(r.note) : 'Kono details nei'}</div>
               </div>
               <div class="sheet-cat">${esc(r.cat || 'General')}</div>
               <div class="sheet-row-actions">
@@ -627,6 +675,7 @@ function renderSheet() {
       const id = el.dataset.id;
       el.querySelector('[data-act="edit"]').onclick = () => editSheetRow(id);
       el.querySelector('[data-act="del"]').onclick = () => {
+        if (!confirm('Ei row ti delete korben?')) return;
         sheetRows = sheetRows.filter(x => x.id !== id);
         save.sheetRows(); renderSheet(); toast('Row muche gelo');
       };
@@ -710,7 +759,7 @@ function renderPins() {
     <div class="item ${p.wake ? '' : 'pin-off'}" data-id="${p.id}"><div class="item-body">
       <div class="pin-cat-tag">${esc(catLabel(p.cat))}</div>
       ${p.title ? `<div class="item-title">${esc(p.title)}</div>` : ''}
-      <div class="note-text">${esc(p.text)}</div>
+      <div class="note-text">${linkify(p.text)}</div>
       <div class="item-meta">${p.wake ? '☀️ uthe dekhabo' : 'uthe dekhabo na'}</div>
     </div>
     <div style="display:flex;flex-direction:column;gap:6px">
@@ -720,7 +769,10 @@ function renderPins() {
   $$('#pinList .item').forEach(el => {
     const id = el.dataset.id;
     el.querySelector('[data-act="wake"]').onclick = () => { const p = pins.find(x => x.id === id); p.wake = !p.wake; save.pins(); renderPins(); };
-    el.querySelector('[data-act="del"]').onclick = () => { pins = pins.filter(x => x.id !== id); save.pins(); renderPins(); toast('Pin baad'); };
+    el.querySelector('[data-act="del"]').onclick = () => { 
+      if (!confirm('Pin ti delete korben?')) return;
+      pins = pins.filter(x => x.id !== id); save.pins(); renderPins(); toast('Pin baad'); 
+    };
   });
 }
 $$('#pinCatSeg .seg-btn').forEach(b => b.onclick = () => {
@@ -741,8 +793,31 @@ $('#pinForm').onsubmit = e => {
 };
 
 /* ============================================================
-   BACKUP
+   BACKUP & SHARE
    ============================================================ */
+$('#cloudShareBtn').onclick = async () => {
+  const data = { tasks, sleeps, checkins, notes, sheetRows, pins, clItems, clLog, _v: 3, _at: new Date().toISOString() };
+  const str = JSON.stringify(data, null, 2);
+  const file = new File([str], `persona-backup-${dayKey()}.json`, { type: 'application/json' });
+  
+  if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({
+        files: [file],
+        title: 'Persona Backup',
+        text: 'Amar Persona app er full backup file'
+      });
+      closeSheet();
+      toast('Share ba Save successful ☁️');
+    } catch (e) {
+      if (e.name !== 'AbortError') toast('Share kora gelo na');
+    }
+  } else {
+    toast('Ei phone e auto-share support kore na, tai download hocche');
+    $('#exportBtn').click();
+  }
+};
+
 $('#exportBtn').onclick = () => {
   const data = { tasks, sleeps, checkins, notes, sheetRows, pins, clItems, clLog, _v: 3, _at: new Date().toISOString() };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -759,13 +834,40 @@ $('#importFile').onchange = e => {
   r.onload = () => {
     try {
       const d = JSON.parse(r.result);
+      // Validate the file is a persona backup
+      if (!d || typeof d !== 'object') { toast('File ta valid backup na'); return; }
+      const incoming = d.tasks?.length || d.notes?.length || d.sheetRows?.length || 0;
+      const hasCurrentData = tasks.length || notes.length || sheetRows.length;
+      if (hasCurrentData && !confirm(`Ekhonkar shob data replace hoye jabe!\nFile te ${d.tasks?.length || 0} task, ${d.notes?.length || 0} note, ${d.sheetRows?.length || 0} sheet row ache.\n\nNijer current data ki auto-save hobe? OK = hya, Cancel = na (cancel korle restore hobena)`)) {
+        e.target.value = ''; return;
+      }
+      // Auto-save current data before overwriting
+      if (hasCurrentData) {
+        const currentData = { tasks, sleeps, checkins, notes, sheetRows, pins, clItems, clLog, _v: 3, _at: new Date().toISOString() };
+        const blob = new Blob([JSON.stringify(currentData, null, 2)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `persona-auto-recovery-${dayKey()}.json`;
+        a.click(); URL.revokeObjectURL(a.href);
+      }
       tasks = d.tasks || []; sleeps = d.sleeps || []; checkins = d.checkins || [];
       notes = d.notes || []; sheetRows = d.sheetRows || []; pins = d.pins || []; clItems = d.clItems || defaultChecklist(); clLog = d.clLog || {};
       Object.values(save).forEach(fn => fn());
       closeSheet(); navTo('home'); toast('Backup restore holo ✅');
-    } catch (err) { toast('File porte parlam na'); }
+    } catch (err) { toast('File porte parlam na — valid JSON ba Persona backup dao'); }
   };
   r.readAsText(f); e.target.value = '';
+};
+
+let autoSnapshotData = DB.get('autoSnapshot', null);
+if (autoSnapshotData) $('#restoreSnapshotBtn').classList.remove('hidden');
+$('#restoreSnapshotBtn').onclick = () => {
+  if (!confirm('Ekhonkar shob data muche ager diner auto-backup restore hobe. Sure?')) return;
+  const d = autoSnapshotData;
+  tasks = d.tasks || []; sleeps = d.sleeps || []; checkins = d.checkins || [];
+  notes = d.notes || []; sheetRows = d.sheetRows || []; pins = d.pins || []; clItems = d.clItems || defaultChecklist(); clLog = d.clLog || {};
+  Object.values(save).forEach(fn => fn());
+  closeSheet(); navTo('home'); toast('Auto-backup theke restore holo ✅');
 };
 
 /* ============================================================
@@ -828,11 +930,26 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden) chec
 /* ============================================================
    INIT
    ============================================================ */
+function checkAutoSnapshot() {
+  const today = dayKey();
+  if (DB.get('lastSnapshotDate') !== today) {
+    if (tasks.length || notes.length || sheetRows.length || pins.length) {
+      const data = { tasks, sleeps, checkins, notes, sheetRows, pins, clItems, clLog, _v: 3, _at: new Date().toISOString() };
+      DB.set('autoSnapshot', data);
+      DB.set('lastSnapshotDate', today);
+      autoSnapshotData = data;
+      $('#restoreSnapshotBtn').classList.remove('hidden');
+    }
+  }
+}
+
 function init() {
   applyTheme();
   $('#themeToggleBtn').onclick = toggleTheme;
   updateNotifBtn();
   initSW();
+  checkAutoSnapshot();
+  updateSheetCatSuggestions();
   navTo('home');
   if (activeSleep) openSleepMode();  // resume ongoing sleep
   checkDueTasks();
