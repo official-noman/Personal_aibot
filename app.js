@@ -93,7 +93,7 @@ function navTo(view, opts = {}) {
   $$('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.nav === view));
   $('#viewTitle').textContent = TITLES[view] || 'Persona';
   $('#viewEyebrow').textContent = EYEBROWS[view] || 'Persona';
-  $('#main').scrollTop = 0;
+  window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
   updateTopActions();
   render(view);
 }
