@@ -582,27 +582,64 @@ function renderSheet() {
     list = list.filter(r => [r.title, r.note, r.cat].some(v => String(v || '').toLowerCase().includes(q)));
   }
   $('#sheetCount').textContent = `${list.length} row`;
-  box.innerHTML = list.length ? list.map(r => `
-    <div class="sheet-row" data-id="${r.id}">
-      <div class="sheet-date">${esc(new Date(r.when).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: '2-digit', hour: 'numeric', minute: '2-digit', hour12: true }))}</div>
-      <div class="sheet-main">
-        <div class="sheet-row-title">${esc(r.title || 'Untitled')}</div>
-        ${r.note ? `<div class="sheet-note">${esc(r.note)}</div>` : ''}
-      </div>
-      <div class="sheet-cat">${esc(r.cat || 'General')}</div>
-      <div class="sheet-row-actions">
-        <button class="mini-action" data-act="edit" title="Edit">✎</button>
-        <button class="del" data-act="del">🗑</button>
-      </div>
-    </div>`).join('') : `<div class="empty">${sheetQuery ? 'Kichu pawa gelo na.' : 'Ekhono kono sheet row nei.'}</div>`;
-  $$('#sheetList .sheet-row').forEach(el => {
-    const id = el.dataset.id;
-    el.querySelector('[data-act="edit"]').onclick = () => editSheetRow(id);
-    el.querySelector('[data-act="del"]').onclick = () => {
-      sheetRows = sheetRows.filter(x => x.id !== id);
-      save.sheetRows(); renderSheet(); toast('Row muche gelo');
-    };
+
+  const grouped = {};
+  list.forEach(r => {
+    const t = (r.title || 'Untitled').trim().toLowerCase();
+    const actualTitle = (r.title || 'Untitled').trim();
+    if (!grouped[t]) grouped[t] = { title: actualTitle, items: [] };
+    grouped[t].items.push(r);
   });
+
+  if (list.length === 0) {
+    box.innerHTML = `<div class="empty">${sheetQuery ? 'Kichu pawa gelo na.' : 'Ekhono kono sheet row nei.'}</div>`;
+  } else {
+    let html = '';
+    for (const key in grouped) {
+      const g = grouped[key];
+      html += `<div class="sheet-group">
+        <div class="sheet-group-header">
+          <div class="sheet-group-title-wrap">
+            <h3 class="sheet-group-title">${esc(g.title)}</h3>
+            <span class="sheet-group-count">${g.items.length} entry</span>
+          </div>
+          <button class="btn btn-soft btn-sm sheet-group-add" type="button" data-title="${esc(g.title)}">＋ Add</button>
+        </div>
+        <div class="sheet-group-items">
+          ${g.items.map(r => `
+            <div class="sheet-row" data-id="${r.id}">
+              <div class="sheet-date">${esc(new Date(r.when).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: '2-digit', hour: 'numeric', minute: '2-digit', hour12: true }))}</div>
+              <div class="sheet-main">
+                <div class="sheet-note">${esc(r.note || 'Kono details nei')}</div>
+              </div>
+              <div class="sheet-cat">${esc(r.cat || 'General')}</div>
+              <div class="sheet-row-actions">
+                <button class="mini-action" data-act="edit" title="Edit">✎</button>
+                <button class="del" data-act="del">🗑</button>
+              </div>
+            </div>`).join('')}
+        </div>
+      </div>`;
+    }
+    box.innerHTML = html;
+
+    $$('#sheetList .sheet-row').forEach(el => {
+      const id = el.dataset.id;
+      el.querySelector('[data-act="edit"]').onclick = () => editSheetRow(id);
+      el.querySelector('[data-act="del"]').onclick = () => {
+        sheetRows = sheetRows.filter(x => x.id !== id);
+        save.sheetRows(); renderSheet(); toast('Row muche gelo');
+      };
+    });
+    $$('#sheetList .sheet-group-add').forEach(btn => {
+      btn.onclick = () => {
+        $('#sheetTitle').value = btn.dataset.title;
+        $('#sheetNote').value = '';
+        $('#sheetNote').focus();
+        $('#sheetForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      };
+    });
+  }
 }
 function editSheetRow(id) {
   const row = sheetRows.find(x => x.id === id);

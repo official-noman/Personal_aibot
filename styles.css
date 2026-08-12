@@ -279,6 +279,14 @@ body.light .switch-row input[type="checkbox"] { background: rgba(16,24,40,.1); }
 .sheet-tools { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; margin: 10px 0; }
 .sheet-count { color: var(--haze); border: 1px solid var(--line); background: rgba(255,255,255,.05); border-radius: 999px; padding: 9px 11px; font-size: 12px; white-space: nowrap; }
 .sheet-list { display: flex; flex-direction: column; gap: 8px; }
+.sheet-group { background: var(--dusk); border: 1px solid var(--line); border-radius: var(--radius); margin-bottom: 12px; overflow: hidden; }
+.sheet-group-header { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; background: rgba(255,255,255,.03); border-bottom: 1px solid var(--line); }
+.sheet-group-title-wrap { display: flex; align-items: center; gap: 8px; }
+.sheet-group-title { font-size: 16px; font-weight: 700; color: var(--star); margin: 0; }
+.sheet-group-count { font-size: 11px; color: var(--haze); background: rgba(255,255,255,.08); padding: 3px 8px; border-radius: 999px; }
+.sheet-group-items { display: flex; flex-direction: column; }
+.sheet-group-items .sheet-row { border: none; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; padding: 12px 16px; }
+.sheet-group-items .sheet-row:last-child { border-bottom: none; }
 .sheet-row {
   display: grid; grid-template-columns: 92px minmax(0, 1fr) auto 58px; gap: 10px; align-items: start;
   background: var(--dusk); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 13px;
