@@ -56,7 +56,7 @@
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-html, body { margin: 0; padding: 0; }
+html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; }
 body {
   background: var(--void);
   color: var(--star);
@@ -117,7 +117,7 @@ body.light .chat-settings,
 body.light .alarm-support { background: rgba(16,24,40,.04); }
 body.light .sheet-backdrop { background: rgba(16,24,40,.24); }
 
-#app { min-height: 100dvh; display: flex; flex-direction: column; }
+#app { height: 100%; display: flex; flex-direction: column; overflow: hidden; }
 
 /* ---------- topbar ---------- */
 .topbar {
