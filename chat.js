@@ -1549,17 +1549,10 @@ function initChatHead() {
   const pos = DB.get('chatHeadPos', null);
   if (pos) { head.style.left = pos.x + 'px'; head.style.top = pos.y + 'px'; head.style.right = 'auto'; head.style.bottom = 'auto'; }
 
-  let dragging = false, moved = false, sx = 0, sy = 0, ox = 0, oy = 0;
-  const down = e => {
-    const p = e.touches ? e.touches[0] : e;
-    dragging = true; moved = false;
-    const r = head.getBoundingClientRect();
-    sx = p.clientX; sy = p.clientY; ox = r.left; oy = r.top;
-  };
+  let dragging = false, moved = false, sx = 0, sy = 0, ox = 0, oy = 0, activePointer = null;
   const move = e => {
-    if (!dragging) return;
-    const p = e.touches ? e.touches[0] : e;
-    const dx = p.clientX - sx, dy = p.clientY - sy;
+    if (!dragging || (activePointer !== null && e.pointerId !== activePointer)) return;
+    const dx = e.clientX - sx, dy = e.clientY - sy;
     if (Math.abs(dx) > 4 || Math.abs(dy) > 4) moved = true;
     if (!moved) return;
     e.preventDefault();
@@ -1569,20 +1562,28 @@ function initChatHead() {
     head.style.left = x + 'px'; head.style.top = y + 'px';
     head.style.right = 'auto'; head.style.bottom = 'auto';
   };
-  const up = () => {
+  const up = e => {
+    if (activePointer !== null && e.pointerId !== activePointer) return;
     if (!dragging) return;
     dragging = false;
+    activePointer = null;
+    head.releasePointerCapture?.(e.pointerId);
     if (moved) {
       const r = head.getBoundingClientRect();
       DB.set('chatHeadPos', { x: Math.round(r.left), y: Math.round(r.top) });
     } else openChat();
   };
-  head.addEventListener('mousedown', down);
-  head.addEventListener('touchstart', down, { passive: true });
-  window.addEventListener('mousemove', move);
-  window.addEventListener('touchmove', move, { passive: false });
-  window.addEventListener('mouseup', up);
-  window.addEventListener('touchend', up);
+  const down = e => {
+    if (e.button !== undefined && e.button !== 0) return;
+    dragging = true; moved = false; activePointer = e.pointerId;
+    const r = head.getBoundingClientRect();
+    sx = e.clientX; sy = e.clientY; ox = r.left; oy = r.top;
+    head.setPointerCapture?.(e.pointerId);
+  };
+  head.addEventListener('pointerdown', down);
+  head.addEventListener('pointermove', move);
+  head.addEventListener('pointerup', up);
+  head.addEventListener('pointercancel', up);
 }
 
 /* ============================================================
