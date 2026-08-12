@@ -82,7 +82,7 @@ button { font-family: inherit; }
 /* ---------- ambient aurora ---------- */
 .aurora-bg { position: fixed; inset: 0; z-index: -2; overflow: hidden; background:
   radial-gradient(120% 80% at 50% -10%, #131a30 0%, var(--void) 55%); }
-.aurora-bg .blob { position: absolute; border-radius: 50%; filter: blur(70px); opacity: .5; mix-blend-mode: screen; }
+.aurora-bg .blob { position: absolute; border-radius: 50%; filter: blur(70px); opacity: .5; mix-blend-mode: screen; will-change: transform; transform: translateZ(0); }
 .blob.b1 { width: 70vw; height: 70vw; top: -25vw; left: -15vw; background: radial-gradient(circle, var(--a-indigo), transparent 65%); animation: drift1 22s ease-in-out infinite; }
 .blob.b2 { width: 60vw; height: 60vw; top: -10vw; right: -20vw; background: radial-gradient(circle, var(--a-teal), transparent 65%); opacity: .38; animation: drift2 28s ease-in-out infinite; }
 .blob.b3 { width: 55vw; height: 55vw; top: 20vh; left: 20vw; background: radial-gradient(circle, var(--a-violet), transparent 65%); opacity: .3; animation: drift3 34s ease-in-out infinite; }
@@ -154,7 +154,7 @@ body.light .sheet-backdrop { background: rgba(16,24,40,.24); }
 
 /* ---------- main ---------- */
 /* nicher padding e bottom-nav + chat head duitar-i jayga rakha ache */
-#main { flex: 1; overflow-y: auto; padding: 6px 18px 150px; -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; scroll-behavior: smooth; }
+#main { flex: 1; overflow-y: auto; padding: 6px 18px 150px; -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; }
 .view { animation: rise .35s cubic-bezier(.2,.7,.2,1); }
 .hidden { display: none !important; }
 @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
@@ -258,7 +258,7 @@ body.light .switch-row input[type="checkbox"] { background: rgba(16,24,40,.1); }
 .seg-btn.active { background: linear-gradient(135deg, var(--a-indigo), var(--a-violet)); color: #fff; }
 
 /* ---------- lists / items ---------- */
-.list { display: flex; flex-direction: column; gap: 9px; content-visibility: auto; contain-intrinsic-size: auto 300px; }
+.list { display: flex; flex-direction: column; gap: 9px; }
 .empty { text-align: center; color: var(--faint); padding: 26px 12px; font-size: 14px; line-height: 1.6; }
 .item { background: var(--dusk); border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 15px; display: flex; align-items: flex-start; gap: 13px; }
 .item.done .item-title { text-decoration: line-through; color: var(--faint); }
@@ -394,7 +394,7 @@ body.light .switch-row input[type="checkbox"] { background: rgba(16,24,40,.1); }
 
 /* ---------- bottom nav ---------- */
 .bottomnav { position: fixed; bottom: 0; left: 0; right: 0; display: flex; z-index: 20;
-  background: rgba(9,12,22,.82); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+  background: rgba(9,12,22,.96);
   border-top: 1px solid var(--line); padding: 9px 6px calc(var(--safe-bottom) + 9px); }
 .nav-btn { flex: 1; background: none; border: none; color: var(--faint); display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 10.5px; cursor: pointer; padding: 3px; transition: color .2s; }
 .nav-ico { font-size: 21px; filter: grayscale(1) opacity(.55); transition: filter .2s, transform .12s; }
