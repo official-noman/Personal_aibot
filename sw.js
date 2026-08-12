@@ -1,5 +1,5 @@
 /* Persona service worker — offline caching + notification clicks */
-const CACHE = 'persona-v22-redmi-performance';
+const CACHE = 'persona-v24-plain-mobile-scroll';
 const ASSETS = [
   './',
   './index.html',
@@ -27,15 +27,28 @@ self.addEventListener('activate', (e) => {
   );
 });
 
-/* Cache-first for app shell; network-first for fonts; skip API. */
+/* App shell network-first: phone PWA te purono CSS/JS cache dhore scroll bug rekhe dito. */
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
-  if (new URL(e.request.url).pathname.startsWith('/api/')) return;
-  // Fonts: network-first so updates apply
-  if (e.request.url.includes('/fonts/')) {
-    e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
+  const url = new URL(e.request.url);
+  if (url.pathname.startsWith('/api/')) return;
+
+  const isAppAsset = url.origin === location.origin &&
+    (url.pathname === '/' ||
+     url.pathname.endsWith('.html') ||
+     url.pathname.endsWith('.css') ||
+     url.pathname.endsWith('.js') ||
+     url.pathname.endsWith('.json'));
+
+  if (isAppAsset || e.request.url.includes('/fonts/')) {
+    e.respondWith(
+      fetch(e.request).then(resp =>
+        caches.open(CACHE).then(c => { c.put(e.request, resp.clone()); return resp; })
+      ).catch(() => caches.match(e.request).then(cached => cached || caches.match('./')))
+    );
     return;
   }
+
   e.respondWith(
     caches.match(e.request).then((cached) =>
       cached ||

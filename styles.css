@@ -162,6 +162,85 @@ button { font-family: inherit; }
   }
 }
 
+html.lite-mobile {
+  --e1: none;
+  --e2: none;
+  --e3: none;
+  --glow: none;
+}
+html.lite-mobile *,
+html.lite-mobile *::before,
+html.lite-mobile *::after {
+  animation-duration: .001ms !important;
+  animation-iteration-count: 1 !important;
+  scroll-behavior: auto !important;
+}
+html.lite-mobile .aurora-bg { background: linear-gradient(180deg, #0b1020 0%, var(--void) 62%); }
+html.lite-mobile .aurora-bg .blob,
+html.lite-mobile .sleep-hero-aurora,
+html.lite-mobile .big-sleep-btn::before,
+html.lite-mobile .chat-aurora,
+html.lite-mobile .chat-head-glow { display: none !important; }
+html.lite-mobile .topbar { background: var(--void); }
+html.lite-mobile .bottomnav { background: var(--night); }
+html.lite-mobile .sheet-backdrop,
+html.lite-mobile .wake-card,
+html.lite-mobile .img-lightbox,
+html.lite-mobile .chat-composer {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+html.lite-mobile .nav-icon-btn,
+html.lite-mobile .icon-btn.on,
+html.lite-mobile .btn-primary,
+html.lite-mobile .bar,
+html.lite-mobile .ring-fg,
+html.lite-mobile .btn-wake,
+html.lite-mobile .toast,
+html.lite-mobile .chat-head,
+html.lite-mobile .chat-avatar,
+html.lite-mobile .chat-settings,
+html.lite-mobile .msg.me .bubble,
+html.lite-mobile .att,
+html.lite-mobile .img-lightbox img,
+html.lite-mobile .tone-opt.sel,
+html.lite-mobile .geo-map-wrap .leaflet-popup-content-wrapper {
+  box-shadow: none !important;
+  filter: none !important;
+}
+html.lite-mobile .view,
+html.lite-mobile .msg,
+html.lite-mobile .att,
+html.lite-mobile .wake-card { animation: none !important; }
+html.lite-mobile body {
+  min-height: auto;
+  overscroll-behavior-y: auto;
+}
+html.lite-mobile #app {
+  display: block;
+  min-height: auto;
+}
+html.lite-mobile .topbar {
+  position: static !important;
+}
+html.lite-mobile .bottomnav {
+  position: static !important;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin-top: 18px;
+}
+html.lite-mobile #main {
+  display: block;
+  min-height: auto;
+  overflow: visible !important;
+  padding-bottom: 24px;
+  touch-action: auto;
+}
+html.lite-mobile .aurora-bg,
+html.lite-mobile .chat-head {
+  display: none !important;
+}
+
 body.light {
   --void: #f6f8fc;
   --night: #ffffff;
@@ -790,4 +869,25 @@ a:hover { text-decoration: underline; }
   .chip-wrap {
     contain: layout;
   }
+}
+
+html.lite-mobile .input-card,
+html.lite-mobile .item,
+html.lite-mobile .stat-card,
+html.lite-mobile .prompt-card,
+html.lite-mobile .sheet-group,
+html.lite-mobile .ring-card,
+html.lite-mobile .cl-row,
+html.lite-mobile .wk-day,
+html.lite-mobile .sheet-row,
+html.lite-mobile .help-row,
+html.lite-mobile .chart,
+html.lite-mobile .sleep-hero,
+html.lite-mobile .big-sleep-btn {
+  contain: layout paint;
+}
+html.lite-mobile .list,
+html.lite-mobile .sheet-list,
+html.lite-mobile .chip-wrap {
+  contain: layout;
 }

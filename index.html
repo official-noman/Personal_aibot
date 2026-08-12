@@ -14,6 +14,22 @@
   <link rel="preload" href="styles.css" as="style" />
   <link rel="stylesheet" href="styles.css" />
   <link rel="preload" href="app.js" as="script" />
+  <script>
+    if (/Android/i.test(navigator.userAgent) || (navigator.deviceMemory && navigator.deviceMemory <= 4)) {
+      document.documentElement.classList.add('lite-mobile');
+    }
+    if (location.search.includes('nocache=1') && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function (regs) {
+        return Promise.all(regs.map(function (reg) { return reg.unregister(); }));
+      }).then(function () {
+        return window.caches ? caches.keys().then(function (keys) {
+          return Promise.all(keys.map(function (key) { return caches.delete(key); }));
+        }) : null;
+      }).finally(function () {
+        location.replace(location.pathname);
+      });
+    }
+  </script>
   <title>Persona</title>
 </head>
 <body>
