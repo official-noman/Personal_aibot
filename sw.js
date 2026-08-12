@@ -1,5 +1,5 @@
 /* Persona service worker — offline caching + notification clicks */
-const CACHE = 'persona-v21-scroll-fix';
+const CACHE = 'persona-v22-redmi-performance';
 const ASSETS = [
   './',
   './index.html',

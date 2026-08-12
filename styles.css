@@ -96,8 +96,70 @@ button { font-family: inherit; }
 @keyframes drift3 { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(5vw,-8vh) scale(1.1)} }
 @media (prefers-reduced-motion: reduce) { .blob { animation: none !important; } }
 @media (max-width: 640px), (pointer: coarse) {
-  .aurora-bg .blob { filter: blur(34px); opacity: .34; animation: none; }
-  .chat-head-glow { animation: none; }
+  :root {
+    --e1: none;
+    --e2: none;
+    --e3: none;
+    --glow: none;
+  }
+
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+
+  .aurora-bg {
+    background: linear-gradient(180deg, #0b1020 0%, var(--void) 62%);
+  }
+  .aurora-bg .blob,
+  .sleep-hero-aurora,
+  .big-sleep-btn::before,
+  .chat-aurora,
+  .chat-head-glow {
+    display: none !important;
+  }
+
+  .topbar {
+    background: var(--void);
+  }
+  .bottomnav {
+    background: var(--night);
+  }
+
+  .sheet-backdrop,
+  .wake-card,
+  .img-lightbox,
+  .chat-composer {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  .nav-icon-btn,
+  .icon-btn.on,
+  .btn-primary,
+  .bar,
+  .ring-fg,
+  .btn-wake,
+  .toast,
+  .chat-head,
+  .chat-avatar,
+  .chat-settings,
+  .msg.me .bubble,
+  .att,
+  .img-lightbox img,
+  .tone-opt.sel,
+  .geo-map-wrap .leaflet-popup-content-wrapper {
+    box-shadow: none !important;
+    filter: none !important;
+  }
+
+  .view,
+  .msg,
+  .att,
+  .wake-card {
+    animation: none !important;
+  }
 }
 
 body.light {
@@ -705,3 +767,27 @@ a.chat-chip { display: inline-flex; align-items: center; text-decoration: none; 
 .geo-search-item small { display: block; color: var(--haze); font-size: 12px; margin-top: 2px; line-height: 1.4; }
 a { color: var(--a-blue); text-decoration: none; }
 a:hover { text-decoration: underline; }
+
+@media (max-width: 640px), (pointer: coarse) {
+  .input-card,
+  .item,
+  .stat-card,
+  .prompt-card,
+  .sheet-group,
+  .ring-card,
+  .cl-row,
+  .wk-day,
+  .sheet-row,
+  .help-row,
+  .chart,
+  .sleep-hero,
+  .big-sleep-btn {
+    contain: layout paint;
+  }
+
+  .list,
+  .sheet-list,
+  .chip-wrap {
+    contain: layout;
+  }
+}
