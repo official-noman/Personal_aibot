@@ -224,21 +224,28 @@ html.lite-mobile .topbar {
   position: static !important;
 }
 html.lite-mobile .bottomnav {
-  position: static !important;
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  margin-top: 18px;
+  position: fixed !important;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  margin-top: 0;
 }
 html.lite-mobile #main {
   display: block;
   min-height: auto;
   overflow: visible !important;
-  padding-bottom: 24px;
+  padding-bottom: 150px;
   touch-action: auto;
 }
-html.lite-mobile .aurora-bg,
-html.lite-mobile .chat-head {
+html.lite-mobile .aurora-bg {
   display: none !important;
+}
+html.lite-mobile .chat-head {
+  display: grid !important;
+  position: fixed !important;
+  right: 16px;
+  bottom: calc(var(--safe-bottom) + 84px);
 }
 
 body.light {
