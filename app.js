@@ -795,61 +795,104 @@ $('#pinForm').onsubmit = e => {
 /* ============================================================
    BACKUP & SHARE
    ============================================================ */
+
+/* --- helpers --- */
+const BACKUP_FILENAME = 'persona-backup.json';   // fixed name — puranotai overwrite hobe
+
+function buildBackupData() {
+  return { tasks, sleeps, checkins, notes, sheetRows, pins, clItems, clLog, _v: 3, _at: new Date().toISOString() };
+}
+
+function markBackupDone() {
+  DB.set('lastBackupTs', Date.now());
+  updateBackupUI();
+}
+
+function updateBackupUI() {
+  const ts  = DB.get('lastBackupTs', null);
+  const lbl = $('#lastBackupLabel');
+  const bar = $('#backupReminderBar');
+  if (!lbl) return;
+
+  if (!ts) {
+    lbl.textContent = 'Ekhono backup neoa hoyni ⚠️';
+    if (bar) { bar.textContent = '⚠️ Backup neoa hoyni — ekhoni niye rakho!'; bar.classList.remove('hidden'); }
+    return;
+  }
+
+  const diffH = (Date.now() - ts) / 3600000;
+  const diffD = Math.floor(diffH / 24);
+  const timeStr = new Date(ts).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true });
+
+  if (diffH < 1) {
+    lbl.textContent = `✅ Eikhuni backup neoa hoyeche`;
+    if (bar) bar.classList.add('hidden');
+  } else if (diffD < 1) {
+    lbl.textContent = `⏱ ${Math.floor(diffH)} ghonta age — ${timeStr}`;
+    if (bar) bar.classList.add('hidden');
+  } else {
+    lbl.textContent = `⚠️ ${diffD} din age — ${timeStr}`;
+    if (bar) { bar.textContent = `⚠️ ${diffD} din backup neoa hoyni — ekhoni niye rakho!`; bar.classList.remove('hidden'); }
+  }
+
+  // nav-btn badge ("Aro" button)
+  const moreBtn = $('[data-nav="more"]');
+  if (moreBtn) moreBtn.classList.toggle('backup-due', diffD >= 1);
+}
+
+/* --- Cloud / Share --- */
 $('#cloudShareBtn').onclick = async () => {
-  const data = { tasks, sleeps, checkins, notes, sheetRows, pins, clItems, clLog, _v: 3, _at: new Date().toISOString() };
-  const str = JSON.stringify(data, null, 2);
-  const file = new File([str], `persona-backup-${dayKey()}.json`, { type: 'application/json' });
-  
+  const data = buildBackupData();
+  const str  = JSON.stringify(data, null, 2);
+  const file = new File([str], BACKUP_FILENAME, { type: 'application/json' });
+
   if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
     try {
-      await navigator.share({
-        files: [file],
-        title: 'Persona Backup',
-        text: 'Amar Persona app er full backup file'
-      });
+      await navigator.share({ files: [file], title: 'Persona Backup', text: 'Amar Persona app er full backup' });
+      markBackupDone();
       closeSheet();
-      toast('Share ba Save successful ☁️');
+      toast('Backup share holo ☁️');
     } catch (e) {
       if (e.name !== 'AbortError') toast('Share kora gelo na');
     }
   } else {
-    toast('Ei phone e auto-share support kore na, tai download hocche');
-    $('#exportBtn').click();
+    toast('Share support nei — download hochhe');
+    doDownloadBackup();
   }
 };
 
+/* --- Download to phone --- */
+function doDownloadBackup() {
+  const blob = new Blob([JSON.stringify(buildBackupData(), null, 2)], { type: 'application/json' });
+  const a    = document.createElement('a');
+  a.href     = URL.createObjectURL(blob);
+  a.download = BACKUP_FILENAME;    // same filename protibar — browser overwrite korbe
+  a.click();
+  URL.revokeObjectURL(a.href);
+  markBackupDone();
+}
+
 $('#exportBtn').onclick = () => {
-  const data = { tasks, sleeps, checkins, notes, sheetRows, pins, clItems, clLog, _v: 3, _at: new Date().toISOString() };
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `persona-backup-${dayKey()}.json`;
-  a.click(); URL.revokeObjectURL(a.href);
-  closeSheet(); toast('Backup download holo ⬇️');
+  doDownloadBackup();
+  closeSheet();
+  toast('Backup download holo ⬇️ — puranotai replace hoyeche');
 };
-$('#importBtn').onclick = () => $('#importFile').click();
+
+/* --- Import / Restore --- */
+$('#importBtn').onclick  = () => $('#importFile').click();
 $('#importFile').onchange = e => {
   const f = e.target.files[0]; if (!f) return;
   const r = new FileReader();
   r.onload = () => {
     try {
       const d = JSON.parse(r.result);
-      // Validate the file is a persona backup
       if (!d || typeof d !== 'object') { toast('File ta valid backup na'); return; }
-      const incoming = d.tasks?.length || d.notes?.length || d.sheetRows?.length || 0;
       const hasCurrentData = tasks.length || notes.length || sheetRows.length;
-      if (hasCurrentData && !confirm(`Ekhonkar shob data replace hoye jabe!\nFile te ${d.tasks?.length || 0} task, ${d.notes?.length || 0} note, ${d.sheetRows?.length || 0} sheet row ache.\n\nNijer current data ki auto-save hobe? OK = hya, Cancel = na (cancel korle restore hobena)`)) {
+      if (hasCurrentData && !confirm(`Ekhonkar shob data replace hoye jabe!\nFile te ${d.tasks?.length || 0} task, ${d.notes?.length || 0} note, ${d.sheetRows?.length || 0} sheet row ache.\n\nCurrent data ki age download hobe? OK = hya`)) {
         e.target.value = ''; return;
       }
-      // Auto-save current data before overwriting
-      if (hasCurrentData) {
-        const currentData = { tasks, sleeps, checkins, notes, sheetRows, pins, clItems, clLog, _v: 3, _at: new Date().toISOString() };
-        const blob = new Blob([JSON.stringify(currentData, null, 2)], { type: 'application/json' });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = `persona-auto-recovery-${dayKey()}.json`;
-        a.click(); URL.revokeObjectURL(a.href);
-      }
+      // current data auto-save before overwrite
+      if (hasCurrentData) doDownloadBackup();
       tasks = d.tasks || []; sleeps = d.sleeps || []; checkins = d.checkins || [];
       notes = d.notes || []; sheetRows = d.sheetRows || []; pins = d.pins || []; clItems = d.clItems || defaultChecklist(); clLog = d.clLog || {};
       Object.values(save).forEach(fn => fn());
@@ -859,6 +902,7 @@ $('#importFile').onchange = e => {
   r.readAsText(f); e.target.value = '';
 };
 
+/* --- Auto Snapshot (daily, localStorage only) --- */
 let autoSnapshotData = DB.get('autoSnapshot', null);
 if (autoSnapshotData) $('#restoreSnapshotBtn').classList.remove('hidden');
 $('#restoreSnapshotBtn').onclick = () => {

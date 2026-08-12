@@ -314,8 +314,9 @@
       <button class="sheet-item" id="themeToggleBtn"><span>☀️</span><div><b>Light mode</b><small>Diner jonno white UI</small></div></button>
       <button class="sheet-item" id="geoNavBtn"><span>📍</span><div><b>Radars</b><small>Jaygay gele reminder — geo-fencing</small></div></button>
       <button class="sheet-item" id="alarmSettingsBtn"><span>⏰</span><div><b>Alarm &amp; ringtone</b><small>Awaj, vibration, snooze — test koro</small></div></button>
-      <button class="sheet-item" id="cloudShareBtn"><span>☁️</span><div><b>Cloud/Share e rakho</b><small>Drive, WhatsApp ba Telegram e file pathao</small></div></button>
-      <button class="sheet-item" id="exportBtn"><span>⬇️</span><div><b>Backup neya</b><small>Sob data file e save koro</small></div></button>
+      <div id="backupReminderBar" class="backup-reminder hidden"></div>
+      <button class="sheet-item" id="cloudShareBtn"><span>☁️</span><div><b>Share / Cloud e pathao</b><small id="lastBackupLabel">Loading…</small></div></button>
+      <button class="sheet-item" id="exportBtn"><span>⬇️</span><div><b>Phone e download</b><small>Same file — puranotai replace hobe</small></div></button>
       <button class="sheet-item" id="importBtn"><span>⬆️</span><div><b>Backup fera</b><small>File theke data restore koro</small></div></button>
       <button class="sheet-item hidden" id="restoreSnapshotBtn"><span>🔄</span><div><b>Auto-Backup fera</b><small>Bhul theke bachte ager diner data</small></div></button>
       <input type="file" id="importFile" accept="application/json" class="hidden" />
