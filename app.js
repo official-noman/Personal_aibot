@@ -887,7 +887,7 @@ function updateBackupUI() {
 }
 
 /* --- Cloud / Share --- */
-$('#cloudShareBtn').onclick = async () => {
+async function doCloudShare() {
   const data = buildBackupData();
   const str  = JSON.stringify(data, null, 2);
   const file = new File([str], BACKUP_FILENAME, { type: 'application/json' });
@@ -919,7 +919,10 @@ $('#cloudShareBtn').onclick = async () => {
     await copyRestoreLink(restoreLink);
     doDownloadBackup();
   }
-};
+}
+
+$('#cloudShareBtn')?.addEventListener('click', doCloudShare);
+$('#cloudSharePageBtn')?.addEventListener('click', doCloudShare);
 
 async function copyRestoreLink(link) {
   try {
