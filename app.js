@@ -64,6 +64,27 @@ function toast(msg) {
   const t = $('#toast'); t.textContent = msg; t.classList.remove('hidden');
   clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.add('hidden'), 2200);
 }
+function bytesToBase64Url(bytes) {
+  let bin = '';
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    bin += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+}
+function base64UrlToBytes(str) {
+  const b64 = String(str || '').replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(str.length / 4) * 4, '=');
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+function encodeBackupLinkData(data) {
+  return bytesToBase64Url(new TextEncoder().encode(JSON.stringify(data)));
+}
+function decodeBackupLinkData(str) {
+  return JSON.parse(new TextDecoder().decode(base64UrlToBytes(str)));
+}
 function fmtDue(iso) {
   return new Date(iso).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit', hour12: true });
 }
@@ -803,6 +824,31 @@ function buildBackupData() {
   return { tasks, sleeps, checkins, notes, sheetRows, pins, clItems, clLog, _v: 3, _at: new Date().toISOString() };
 }
 
+function applyBackupData(d) {
+  tasks = Array.isArray(d.tasks) ? d.tasks : [];
+  sleeps = Array.isArray(d.sleeps) ? d.sleeps : [];
+  checkins = Array.isArray(d.checkins) ? d.checkins : [];
+  notes = Array.isArray(d.notes) ? d.notes : [];
+  sheetRows = Array.isArray(d.sheetRows) ? d.sheetRows : [];
+  pins = Array.isArray(d.pins) ? d.pins : [];
+  clItems = Array.isArray(d.clItems) ? d.clItems : defaultChecklist();
+  clLog = d.clLog && typeof d.clLog === 'object' ? d.clLog : {};
+  Object.values(save).forEach(fn => fn());
+  updateSheetCatSuggestions();
+}
+
+function backupSummary(d) {
+  return `${d.tasks?.length || 0} task, ${d.notes?.length || 0} note, ${d.sheetRows?.length || 0} sheet row`;
+}
+
+function makeRestoreLink(data) {
+  const url = new URL(location.href);
+  url.search = '';
+  url.hash = '';
+  url.searchParams.set('restore', encodeBackupLinkData(data));
+  return url.toString();
+}
+
 function markBackupDone() {
   DB.set('lastBackupTs', Date.now());
   updateBackupUI();
@@ -845,6 +891,8 @@ $('#cloudShareBtn').onclick = async () => {
   const data = buildBackupData();
   const str  = JSON.stringify(data, null, 2);
   const file = new File([str], BACKUP_FILENAME, { type: 'application/json' });
+  const restoreLink = makeRestoreLink(data);
+  const shareText = `Persona backup (${backupSummary(data)}). PC/phone e open korle restore option ashbe:\n${restoreLink}`;
 
   if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
     try {
@@ -855,11 +903,33 @@ $('#cloudShareBtn').onclick = async () => {
     } catch (e) {
       if (e.name !== 'AbortError') toast('Share kora gelo na');
     }
+  } else if (navigator.share) {
+    try {
+      await navigator.share({ title: 'Persona Backup Link', text: shareText, url: restoreLink });
+      markBackupDone();
+      closeSheet();
+      toast('Backup link share holo ☁️');
+    } catch (e) {
+      if (e.name !== 'AbortError') {
+        await copyRestoreLink(restoreLink);
+        doDownloadBackup();
+      }
+    }
   } else {
-    toast('Share support nei — download hochhe');
+    await copyRestoreLink(restoreLink);
     doDownloadBackup();
   }
 };
+
+async function copyRestoreLink(link) {
+  try {
+    await navigator.clipboard.writeText(link);
+    toast('Restore link copy holo — WhatsApp/Gmail e paste koro');
+    closeSheet();
+  } catch (e) {
+    toast('Share support nei — backup download hochhe');
+  }
+}
 
 /* --- Download to phone --- */
 function doDownloadBackup() {
@@ -893,9 +963,7 @@ $('#importFile').onchange = e => {
       }
       // current data auto-save before overwrite
       if (hasCurrentData) doDownloadBackup();
-      tasks = d.tasks || []; sleeps = d.sleeps || []; checkins = d.checkins || [];
-      notes = d.notes || []; sheetRows = d.sheetRows || []; pins = d.pins || []; clItems = d.clItems || defaultChecklist(); clLog = d.clLog || {};
-      Object.values(save).forEach(fn => fn());
+      applyBackupData(d);
       closeSheet(); navTo('home'); toast('Backup restore holo ✅');
     } catch (err) { toast('File porte parlam na — valid JSON ba Persona backup dao'); }
   };
@@ -908,9 +976,7 @@ if (autoSnapshotData) $('#restoreSnapshotBtn').classList.remove('hidden');
 $('#restoreSnapshotBtn').onclick = () => {
   if (!confirm('Ekhonkar shob data muche ager diner auto-backup restore hobe. Sure?')) return;
   const d = autoSnapshotData;
-  tasks = d.tasks || []; sleeps = d.sleeps || []; checkins = d.checkins || [];
-  notes = d.notes || []; sheetRows = d.sheetRows || []; pins = d.pins || []; clItems = d.clItems || defaultChecklist(); clLog = d.clLog || {};
-  Object.values(save).forEach(fn => fn());
+  applyBackupData(d);
   closeSheet(); navTo('home'); toast('Auto-backup theke restore holo ✅');
 };
 
@@ -993,9 +1059,34 @@ function init() {
   updateNotifBtn();
   initSW();
   checkAutoSnapshot();
+  updateBackupUI();
   updateSheetCatSuggestions();
   navTo('home');
   if (activeSleep) openSleepMode();  // resume ongoing sleep
   checkDueTasks();
+  maybeRestoreFromLink();
 }
 init();
+
+function maybeRestoreFromLink() {
+  const params = new URLSearchParams(location.search);
+  const packed = params.get('restore');
+  if (!packed) return;
+  try {
+    const d = decodeBackupLinkData(packed);
+    if (!d || typeof d !== 'object') throw new Error('Invalid backup');
+    const hasCurrentData = tasks.length || notes.length || sheetRows.length || pins.length;
+    const ok = confirm(`Persona backup pawa geche: ${backupSummary(d)}.\n\nEi device e restore korbo?${hasCurrentData ? '\nCurrent data age download hobe.' : ''}`);
+    if (ok) {
+      if (hasCurrentData) doDownloadBackup();
+      applyBackupData(d);
+      markBackupDone();
+      toast('Link theke backup restore holo ✅');
+      navTo('home', { replace: true });
+    }
+  } catch (e) {
+    toast('Restore link ta valid na');
+  } finally {
+    history.replaceState(null, '', location.pathname);
+  }
+}

@@ -300,6 +300,26 @@
         <div class="section-head"><h3>Active Radars</h3></div>
         <div id="geoList" class="list"></div>
       </section>
+
+      <!-- ============ MORE ============ -->
+      <section class="view hidden" data-view="more">
+        <div class="more-list">
+          <button class="sheet-item" data-goto="checkin"><span>📝</span><div><b>Check-in</b><small>Shokal / rater mood o bhabna</small></div></button>
+          <button class="sheet-item" data-goto="notes"><span>💡</span><div><b>Notes</b><small>Likhe rakho, khoje ber koro</small></div></button>
+          <button class="sheet-item" data-goto="sheet"><span>📊</span><div><b>Sheet</b><small>Date-time onujayi entry rakho</small></div></button>
+          <button class="sheet-item" data-goto="pins"><span>🤲</span><div><b>Uthe ja dekhbo</b><small>Dua, niyom, reminder pin koro</small></div></button>
+          <button class="sheet-item" id="openChatPageBtn"><span>✨</span><div><b>Persona AI</b><small>Chat e bolo, ami kore dibo</small></div></button>
+          <button class="sheet-item" data-goto="helpdesk"><span>🧭</span><div><b>AI Help Desk</b><small>Command guide &amp; limitations</small></div></button>
+          <button class="sheet-item" id="themeTogglePageBtn"><span>☀️</span><div><b>Light mode</b><small>Diner jonno white UI</small></div></button>
+          <button class="sheet-item" id="geoNavPageBtn"><span>📍</span><div><b>Radars</b><small>Jaygay gele reminder — geo-fencing</small></div></button>
+          <button class="sheet-item" id="alarmSettingsPageBtn"><span>⏰</span><div><b>Alarm &amp; ringtone</b><small>Awaj, vibration, snooze — test koro</small></div></button>
+          <div id="backupReminderPageBar" class="backup-reminder hidden"></div>
+          <button class="sheet-item" id="cloudSharePageBtn"><span>☁️</span><div><b>Share / Cloud e pathao</b><small id="lastBackupPageLabel">Loading…</small></div></button>
+          <button class="sheet-item" id="exportPageBtn"><span>⬇️</span><div><b>Phone e download</b><small>Same file — puranotai replace hobe</small></div></button>
+          <button class="sheet-item" id="importPageBtn"><span>⬆️</span><div><b>Backup fera</b><small>File theke data restore koro</small></div></button>
+          <button class="sheet-item hidden" id="restoreSnapshotPageBtn"><span>🔄</span><div><b>Auto-Backup fera</b><small>Bhul theke bachte ager diner data</small></div></button>
+        </div>
+      </section>
     </main>
 
     <nav class="bottomnav">
